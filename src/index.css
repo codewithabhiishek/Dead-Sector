@@ -3,6 +3,7 @@
 @theme {
   --font-display: "Creepster", "Impact", "Arial Black", sans-serif;
   --font-ui: "Oxanium", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-mono: "Share Tech Mono", "Courier New", monospace;
   --color-toxic: #a3f52e;
   --color-toxic-dim: #5c8f1e;
   --color-toxic-dark: #1c2b10;
@@ -181,11 +182,13 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 9.5px;
+  font-size: 9px;
+  line-height: 1;
   letter-spacing: 0.05em;
   color: #d8ecc0;
   background: linear-gradient(180deg, #233218, #111a0c);
@@ -537,15 +540,57 @@ canvas.game-canvas {
   display: block;
 }
 
-/* ---------- responsive refinements ---------- */
+/* ---------- responsive & safe-area refinements ---------- */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* sleek tactical custom scrollbar when mobile panels scroll */
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: rgba(4, 8, 4, 0.6);
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(163, 245, 46, 0.35);
+  border-radius: 2px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(163, 245, 46, 0.7);
+}
+
 @media (max-width: 640px) {
   .keycap {
-    min-width: 24px;
-    height: 23px;
-    font-size: 10px;
-    padding: 0 5px;
+    min-width: 17px;
+    height: 17px;
+    font-size: 8px;
+    padding: 0 3px;
   }
   .stencil {
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
+  }
+  .btn-diff {
+    padding: 0.35rem 0.2rem;
+    font-size: 9.5px;
+  }
+  .btn-diff .diff-sub {
+    font-size: 7px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .btn-deploy {
+    height: 38px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+  }
+  .wave-cell {
+    min-height: 30px;
+    height: 32px;
   }
 }

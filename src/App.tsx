@@ -95,7 +95,7 @@ export default function App() {
       <div className="hurt-flash absolute inset-0 z-10" style={{ opacity: s.hurt * 0.9 }} />
       {s.lowHp && s.phase === "playing" && <div className="lowhp-vignette absolute inset-0 z-10" />}
 
-      <HUD />
+      <HUD engine={engine} />
       <Banner />
       <TouchControls engine={engine} />
 

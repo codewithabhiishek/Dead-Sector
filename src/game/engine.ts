@@ -550,6 +550,7 @@ export class Engine {
     window.addEventListener("mousedown", this.onMouseDown);
     window.addEventListener("mouseup", this.onMouseUp);
     window.addEventListener("resize", this.onResize);
+    window.addEventListener("orientationchange", this.onResize);
     window.addEventListener("blur", this.onBlur);
     this.canvas.addEventListener("contextmenu", this.onCtx);
   }
@@ -563,6 +564,7 @@ export class Engine {
     window.removeEventListener("mousedown", this.onMouseDown);
     window.removeEventListener("mouseup", this.onMouseUp);
     window.removeEventListener("resize", this.onResize);
+    window.removeEventListener("orientationchange", this.onResize);
     window.removeEventListener("blur", this.onBlur);
     this.canvas.removeEventListener("contextmenu", this.onCtx);
     sfx.stopDrone();

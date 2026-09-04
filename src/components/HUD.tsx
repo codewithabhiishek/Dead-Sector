@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { store, type Snapshot } from "../game/store";
-import { DIFFS } from "../game/engine";
+import { DIFFS, type Engine } from "../game/engine";
 
 export function useSnap(): Snapshot {
   return useSyncExternalStore(store.subscribe, store.get);
@@ -10,7 +10,7 @@ export function useSnap(): Snapshot {
 
 export function Biohazard({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M12 8.6a3.4 3.4 0 0 0-3.4 3.4c0 .9.35 1.72.93 2.33l-1.2 1.2A5.1 5.1 0 0 1 6.9 12 5.1 5.1 0 0 1 11 6.97V5.26A6.8 6.8 0 0 0 5.2 12c0 .6.08 1.18.22 1.73l-1.6.93A8.6 8.6 0 0 1 3.4 12c0-4.75 3.85-8.6 8.6-8.6s8.6 3.85 8.6 8.6c0 .93-.15 1.83-.42 2.67l-1.6-.93c.15-.55.22-1.13.22-1.74a6.8 6.8 0 0 0-5.8-6.73v1.7A5.1 5.1 0 0 1 17.1 12a5.1 5.1 0 0 1-1.43 3.53l-1.2-1.2c.58-.6.93-1.43.93-2.33A3.4 3.4 0 0 0 12 8.6Zm-1.7 8.96 1.7-1 1.7 1a3.42 3.42 0 0 1-3.4 0Zm-5.1 2.1a6.78 6.78 0 0 0 4.1-.55l-.83-1.44a5.1 5.1 0 0 1-4.37.1l-.7 1.62c.58.16 1.18.27 1.8.27Zm13.6 0c.62 0 1.22-.1 1.8-.26l-.7-1.63a5.1 5.1 0 0 1-4.37-.1l-.83 1.45c1.29.6 2.79.67 4.1.54Z" />
     </svg>
   );
@@ -18,7 +18,7 @@ export function Biohazard({ className = "w-4 h-4" }: { className?: string }) {
 
 function Skull({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M12 2a8 8 0 0 0-8 8c0 2.9 1.56 5.43 3.88 6.82L8 20a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l.12-3.18A8.01 8.01 0 0 0 12 2ZM9 13a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm-3 4.5-1.5-2.5h3L12 17.5Z" />
     </svg>
   );
@@ -26,7 +26,7 @@ function Skull({ className = "w-4 h-4" }: { className?: string }) {
 
 function Bolt({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
     </svg>
   );
@@ -34,7 +34,7 @@ function Bolt({ className = "w-4 h-4" }: { className?: string }) {
 
 function BulletIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M9 2c3 2.5 5 6 5 9v5H4V11c0-3 2-6.5 5-9Zm-5 16h10v4H4v-4Zm12-7h6v11h-6V11Z" />
     </svg>
   );
@@ -42,7 +42,7 @@ function BulletIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 function ShieldIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" />
     </svg>
   );
@@ -50,7 +50,7 @@ function ShieldIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 function DashIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
       <path d="M3 7h8v2H3V7Zm4 4h14v2H7v-2Zm-4 4h10v2H3v-2Zm16-8 4 3-4 3V7Z" />
     </svg>
   );
@@ -64,34 +64,34 @@ function fmtTime(s: number): string {
   return `${m}:${ss.toString().padStart(2, "0")}`;
 }
 
-function HpPanel({ s }: { s: Snapshot }) {
+function HpPanel({ s, compact = false }: { s: Snapshot; compact?: boolean }) {
   const frac = s.hp / s.maxHp;
   const critical = s.hp <= 30;
   return (
-    <div className="hud-panel corners px-4 py-3 w-[240px]">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          <Biohazard className={`w-5 h-5 ${critical ? "text-blood" : "text-toxic"}`} />
-          <span className="stencil text-[10px] text-toxic/80">Vitals</span>
+    <div className={`hud-panel corners ${compact ? "px-2.5 py-1.5 w-[clamp(170px,44vw,220px)]" : "px-3.5 py-2.5 w-[clamp(200px,22vw,240px)]"}`}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5">
+          <Biohazard className={`w-4 h-4 shrink-0 ${critical ? "text-blood animate-pulse" : "text-toxic"}`} />
+          <span className="stencil text-[9px] text-toxic/80">Vitals</span>
         </div>
-        <span className={`font-extrabold text-lg leading-none ${critical ? "text-blood" : "text-bone"}`}>
+        <span className={`font-extrabold ${compact ? "text-base" : "text-lg"} leading-none tabular-nums ${critical ? "text-blood" : "text-bone"}`}>
           {s.hp}
-          <span className="text-[10px] text-bone/50 font-semibold">/{s.maxHp}</span>
+          <span className="text-[9.5px] text-bone/50 font-semibold">/{s.maxHp}</span>
         </span>
       </div>
-      <div className="bar-track relative h-3.5 stripes overflow-hidden">
+      <div className={`bar-track relative ${compact ? "h-2.5" : "h-3"} stripes overflow-hidden`}>
         <div
           className={`bar-fill-hp absolute inset-y-0 left-0 ${critical ? "critical" : ""}`}
           style={{ width: `${Math.max(0, frac * 100)}%` }}
         />
       </div>
       {/* stamina */}
-      <div className={`mt-1.5 transition-opacity duration-300 ${s.stamina > 99 && !s.sprinting ? "opacity-45" : "opacity-100"}`}>
+      <div className={`mt-1 transition-opacity duration-300 ${s.stamina > 99 && !s.sprinting ? "opacity-45" : "opacity-100"}`}>
         <div className="flex items-center justify-between mb-0.5">
-          <span className="stencil text-[8px] text-bone/45">Stamina</span>
-          {s.sprinting && <span className="stencil text-[8px] text-ember animate-pulse">Sprinting</span>}
+          <span className="stencil text-[7.5px] text-bone/45">Stamina</span>
+          {s.sprinting && <span className="stencil text-[7.5px] text-ember animate-pulse">Sprinting</span>}
         </div>
-        <div className="bar-track relative h-1.5 overflow-hidden">
+        <div className="bar-track relative h-1 overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bar-fill-generic"
             style={{
@@ -103,9 +103,9 @@ function HpPanel({ s }: { s: Snapshot }) {
         </div>
       </div>
       {s.shield > 0 && (
-        <div className="mt-1.5 flex items-center gap-2">
-          <ShieldIcon className="w-3.5 h-3.5 text-[#6be3ff]" />
-          <div className="bar-track relative h-1.5 flex-1 overflow-hidden">
+        <div className="mt-1 flex items-center gap-1.5">
+          <ShieldIcon className="w-3 h-3 text-[#6be3ff] shrink-0" />
+          <div className="bar-track relative h-1 flex-1 overflow-hidden">
             <div
               className="absolute inset-y-0 left-0 bg-[#6be3ff] bar-fill-generic"
               style={{ width: `${(s.shield / 6) * 100}%`, boxShadow: "0 0 8px rgba(107,227,255,0.7)" }}
@@ -117,30 +117,31 @@ function HpPanel({ s }: { s: Snapshot }) {
   );
 }
 
-function ScorePanel({ s }: { s: Snapshot }) {
+function ScorePanel({ s, compact = false }: { s: Snapshot; compact?: boolean }) {
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="hud-panel corners px-4 py-2.5 min-w-[210px]">
-        <div className="flex items-center justify-between gap-6">
-          <span className="stencil text-[10px] text-toxic/80">Score</span>
-          <span className="font-extrabold text-2xl leading-none text-acid tabular-nums">
+    <div className={`flex flex-col ${compact ? "items-start gap-1" : "items-end gap-1.5"}`}>
+      <div className={`hud-panel corners ${compact ? "px-2.5 py-1.5 min-w-[140px]" : "px-3.5 py-2 min-w-[190px]"}`}>
+        <div className="flex items-center justify-between gap-4">
+          <span className="stencil text-[9px] text-toxic/80">Score</span>
+          <span className={`font-extrabold ${compact ? "text-lg" : "text-xl"} leading-none text-acid tabular-nums`}>
             {s.score.toLocaleString()}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-6 mt-1">
-          <span className="stencil text-[9px] text-bone/40">Best</span>
-          <span className="text-[11px] font-bold text-bone/60 tabular-nums">{s.best.toLocaleString()}</span>
+        <div className="flex items-center justify-between gap-4 mt-0.5">
+          <span className="stencil text-[8px] text-bone/40">Best</span>
+          <span className="text-[10px] font-bold text-bone/60 tabular-nums">{s.best.toLocaleString()}</span>
         </div>
       </div>
+
       {s.combo > 1 && (
-        <div key={s.combo} className="hud-panel combo-pop px-3 py-2 border-ember/50! min-w-[170px]">
-          <div className="flex items-center justify-between gap-4">
-            <span className="stencil text-[10px] text-ember">Combo</span>
-            <span className="font-extrabold text-xl leading-none text-ember tabular-nums">
+        <div key={s.combo} className={`hud-panel combo-pop ${compact ? "px-2 py-1 min-w-[130px]" : "px-3 py-1.5 min-w-[160px]"} border-ember/50!`}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="stencil text-[9px] text-ember">Combo</span>
+            <span className="font-extrabold text-base leading-none text-ember tabular-nums">
               ×{s.comboMult.toFixed(1)}
             </span>
           </div>
-          <div className="bar-track relative h-1.5 mt-1.5 overflow-hidden">
+          <div className="bar-track relative h-1 mt-1 overflow-hidden">
             <div
               className="absolute inset-y-0 left-0 bg-ember bar-fill-generic"
               style={{ width: `${s.comboFrac * 100}%`, boxShadow: "0 0 8px rgba(255,179,71,0.7)" }}
@@ -148,13 +149,14 @@ function ScorePanel({ s }: { s: Snapshot }) {
           </div>
         </div>
       )}
-      <div className="hud-panel px-3 py-2 min-w-[170px]">
-        <div className="flex items-center justify-between gap-4">
-          <span className="stencil text-[10px] text-toxic/80">
-            {s.wave <= 10 ? `Wave ${s.wave} / 10` : `Wave ${s.wave} · OT`}
+
+      <div className={`hud-panel ${compact ? "px-2.5 py-1 min-w-[130px]" : "px-3 py-1.5 min-w-[160px]"}`}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="stencil text-[9px] text-toxic/80">
+            {s.wave <= 10 ? `Wave ${s.wave}/10` : `Wave ${s.wave} · OT`}
           </span>
-          <span className="flex items-center gap-1.5 text-[11px] font-bold text-bone/70 tabular-nums">
-            <Skull className="w-3.5 h-3.5 text-blood" />
+          <span className="flex items-center gap-1 text-[10px] font-bold text-bone/70 tabular-nums">
+            <Skull className="w-3 h-3 text-blood shrink-0" />
             {s.left} LEFT
           </span>
         </div>
@@ -163,28 +165,28 @@ function ScorePanel({ s }: { s: Snapshot }) {
   );
 }
 
-function WeaponPanel({ s }: { s: Snapshot }) {
+function WeaponPanel({ s, compact = false }: { s: Snapshot; compact?: boolean }) {
   const reloading = s.reloading >= 0;
   return (
-    <div className="hud-panel corners px-4 py-3 w-[250px]">
+    <div className={`hud-panel corners ${compact ? "px-2.5 py-1.5 w-[clamp(160px,42vw,220px)]" : "px-3.5 py-2.5 w-[clamp(210px,22vw,250px)]"}`}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <BulletIcon className={`w-4 h-4 shrink-0 ${reloading ? "text-ember" : "text-toxic"}`} />
-          <span className="stencil text-[10px] text-toxic/80 truncate">{s.weapon}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <BulletIcon className={`w-3.5 h-3.5 shrink-0 ${reloading ? "text-ember" : "text-toxic"}`} />
+          <span className="stencil text-[9px] text-toxic/80 truncate">{s.weapon}</span>
         </div>
-        <div className="flex gap-[3px] items-end">
+        <div className="flex gap-[2px] items-end shrink-0">
           {Array.from({ length: 7 }).map((_, i) => {
             const on = i <= s.weaponTier;
             const col = !on ? "bg-bone/15" : i === 6 ? "bg-[#7ce7ff]" : i === 5 ? "bg-ember" : "bg-acid";
-            return <span key={i} className={`w-1.5 skew-x-[-12deg] ${i >= 5 ? "h-3.5" : "h-3"} ${col}`} />;
+            return <span key={i} className={`w-1.5 skew-x-[-12deg] ${i >= 5 ? "h-3" : "h-2.5"} ${col}`} />;
           })}
         </div>
       </div>
       <div className="flex items-end justify-between mt-1">
         {reloading ? (
           <div className="w-full">
-            <span className="stencil text-[10px] text-ember">Reloading…</span>
-            <div className="bar-track relative h-2 mt-1 overflow-hidden">
+            <span className="stencil text-[9px] text-ember">Reloading…</span>
+            <div className="bar-track relative h-1.5 mt-0.5 overflow-hidden">
               <div
                 className="absolute inset-y-0 left-0 bg-ember bar-fill-generic"
                 style={{ width: `${(s.reloading as number) * 100}%` }}
@@ -193,22 +195,22 @@ function WeaponPanel({ s }: { s: Snapshot }) {
           </div>
         ) : (
           <>
-            <span className="font-extrabold text-3xl leading-none text-bone tabular-nums">
+            <span className={`font-extrabold ${compact ? "text-2xl" : "text-3xl"} leading-none text-bone tabular-nums`}>
               {s.ammo}
-              <span className="text-xs text-bone/40 font-bold"> /{s.mag}</span>
+              <span className="text-[11px] text-bone/40 font-bold">/{s.mag}</span>
             </span>
-            <span className="stencil text-[9px] text-bone/40 mb-0.5">R — reload</span>
+            <span className="stencil text-[8px] text-bone/40 mb-0.5">R — reload</span>
           </>
         )}
       </div>
-      <div className="mt-2">
-        <div className="flex items-center justify-between mb-1">
-          <span className="stencil text-[9px] text-bone/50">
-            {s.tierKills > 0 ? `Next weapon in ${s.tierKills} kills` : "Arsenal maxed"}
+      <div className="mt-1.5">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="stencil text-[8px] text-bone/50 truncate">
+            {s.tierKills > 0 ? `Next tier: ${s.tierKills} kills` : "Max arsenal"}
           </span>
-          <span className="text-[9px] font-bold text-bone/40 tabular-nums">{s.kills} kills</span>
+          <span className="text-[8px] font-bold text-bone/40 tabular-nums shrink-0">{s.kills} kills</span>
         </div>
-        <div className="bar-track relative h-1.5 overflow-hidden">
+        <div className="bar-track relative h-1 overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bar-fill-generic"
             style={{
@@ -228,19 +230,20 @@ function StatusPanel({ s }: { s: Snapshot }) {
   if (s.buffs.frenzy > 0) buffs.push({ key: "f", label: "FRENZY", v: s.buffs.frenzy, max: 8, col: "#ffd166" });
   if (s.buffs.power > 0) buffs.push({ key: "p", label: "HOLLOW PT", v: s.buffs.power, max: 8, col: "#ff9d5c" });
   if (s.buffs.shield > 0) buffs.push({ key: "s", label: "SHIELD", v: s.buffs.shield, max: 6, col: "#6be3ff" });
+
   return (
-    <div className="flex flex-col gap-2 items-start">
-      <div className="hud-panel px-3 py-2 w-[190px]">
+    <div className="flex flex-col gap-1.5 items-start">
+      <div className="hud-panel px-3 py-1.5 w-[clamp(160px,20vw,190px)]">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <DashIcon className={`w-4 h-4 ${s.dashFrac >= 1 ? "text-acid" : "text-bone/40"}`} />
-            <span className="stencil text-[10px] text-toxic/80">Dash</span>
+          <span className="flex items-center gap-1.5">
+            <DashIcon className={`w-3.5 h-3.5 ${s.dashFrac >= 1 ? "text-acid" : "text-bone/40"}`} />
+            <span className="stencil text-[9px] text-toxic/80">Dash</span>
           </span>
-          <span className={`stencil text-[9px] ${s.dashFrac >= 1 ? "text-acid" : "text-bone/40"}`}>
+          <span className={`stencil text-[8px] ${s.dashFrac >= 1 ? "text-acid" : "text-bone/40"}`}>
             {s.dashFrac >= 1 ? "READY" : "CHARGING"}
           </span>
         </div>
-        <div className="bar-track relative h-1.5 mt-1.5 overflow-hidden">
+        <div className="bar-track relative h-1 mt-1 overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bar-fill-generic"
             style={{
@@ -252,17 +255,17 @@ function StatusPanel({ s }: { s: Snapshot }) {
         </div>
       </div>
       {buffs.map((b) => (
-        <div key={b.key} className="hud-panel px-3 py-1.5 w-[190px]">
+        <div key={b.key} className="hud-panel px-3 py-1 w-[clamp(160px,20vw,190px)]">
           <div className="flex items-center justify-between">
-            <span className="stencil text-[10px]" style={{ color: b.col }}>
+            <span className="stencil text-[9px]" style={{ color: b.col }}>
               <Bolt className="w-3 h-3 inline -mt-0.5 mr-1" />
               {b.label}
             </span>
-            <span className="text-[11px] font-bold tabular-nums" style={{ color: b.col }}>
+            <span className="text-[10px] font-bold tabular-nums" style={{ color: b.col }}>
               {b.v.toFixed(1)}s
             </span>
           </div>
-          <div className="bar-track relative h-1 mt-1 overflow-hidden">
+          <div className="bar-track relative h-1 mt-0.5 overflow-hidden">
             <div
               className="absolute inset-y-0 left-0 bar-fill-generic"
               style={{ width: `${(b.v / b.max) * 100}%`, background: b.col }}
@@ -270,15 +273,14 @@ function StatusPanel({ s }: { s: Snapshot }) {
           </div>
         </div>
       ))}
-      <div className="stencil text-[9px] text-bone/35 pl-1 tabular-nums">T+{fmtTime(s.time)}</div>
+      <div className="stencil text-[8.5px] text-bone/35 pl-1 tabular-nums">T+{fmtTime(s.time)}</div>
       <div
-        className={`stencil text-[9px] pl-1 ${
+        className={`stencil text-[8.5px] pl-1 ${
           s.difficulty === "nightmare" ? "text-blood" : s.difficulty === "recruit" ? "text-bone/60" : "text-ember/80"
         }`}
       >
         {DIFFS[s.difficulty].label} PROTOCOL
       </div>
-      <div className="stencil text-[8px] text-bone/25 pl-1 tracking-wider">[F] MAXIMIZE · [M] AUDIO</div>
     </div>
   );
 }
@@ -286,39 +288,67 @@ function StatusPanel({ s }: { s: Snapshot }) {
 function BossBar({ s }: { s: Snapshot }) {
   if (!s.boss) return null;
   return (
-    <div className="w-[min(560px,80vw)]">
+    <div className="w-[min(540px,86vw)]">
       <div className="flex items-center justify-between mb-1 px-1">
-        <span className="stencil text-[11px] text-blood flex items-center gap-2">
-          <Skull className="w-4 h-4" /> {s.boss.name}
+        <span className="stencil text-[10.5px] text-blood flex items-center gap-1.5 font-bold">
+          <Skull className="w-3.5 h-3.5" /> {s.boss.name}
         </span>
-        <span className="text-[11px] font-bold text-blood/80 tabular-nums">{Math.ceil(s.boss.frac * 100)}%</span>
+        <span className="text-[10.5px] font-bold text-blood/80 tabular-nums">{Math.ceil(s.boss.frac * 100)}%</span>
       </div>
-      <div className="bar-track relative h-3 overflow-hidden border-blood/50!">
+      <div className="bar-track relative h-2.5 sm:h-3 overflow-hidden border-blood/50!">
         <div className="boss-fill absolute inset-y-0 left-0" style={{ width: `${s.boss.frac * 100}%` }} />
       </div>
     </div>
   );
 }
 
-export default function HUD() {
+export default function HUD({ engine }: { engine?: Engine | null }) {
   const s = useSnap();
   if (s.phase !== "playing" && s.phase !== "paused") return null;
+
+  const isTouch = engine?.isTouch ?? false;
+
   return (
-    <div className="absolute inset-0 pointer-events-none z-20 font-ui">
-      <div className="absolute top-4 left-4 flex flex-col gap-2 items-start">
-        <HpPanel s={s} />
-        <ScorePanel s={s} />
-      </div>
-      {/* top-right is reserved for the canvas TAC-MAP */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2">
+    <div className="absolute inset-0 pointer-events-none z-20 font-ui select-none">
+      {/* Top Center Boss Bar */}
+      <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-30">
         <BossBar s={s} />
       </div>
-      <div className="absolute bottom-4 left-4">
-        <StatusPanel s={s} />
-      </div>
-      <div className="absolute bottom-4 right-4">
-        <WeaponPanel s={s} />
-      </div>
+
+      {isTouch ? (
+        /* ================= MOBILE / TOUCH SCREEN HUD ================= */
+        <>
+          {/* Top Left: Compact Vitals */}
+          <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] left-[max(0.6rem,env(safe-area-inset-left))] flex flex-col gap-1.5 items-start">
+            <HpPanel s={s} compact />
+            <ScorePanel s={s} compact />
+          </div>
+
+          {/* Top Right: Compact Weapon docked next to Pause button */}
+          <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] right-[max(4.5rem,calc(env(safe-area-inset-right)+3.8rem))] flex flex-col items-end gap-1">
+            <WeaponPanel s={s} compact />
+          </div>
+        </>
+      ) : (
+        /* ================= DESKTOP / LAPTOP HUD ================= */
+        <>
+          {/* Top Left: HP + Score */}
+          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] flex flex-col gap-2 items-start">
+            <HpPanel s={s} />
+            <ScorePanel s={s} />
+          </div>
+
+          {/* Bottom Left: Dash & Buffs Status */}
+          <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))]">
+            <StatusPanel s={s} />
+          </div>
+
+          {/* Bottom Right: Weapon Status */}
+          <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))]">
+            <WeaponPanel s={s} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
