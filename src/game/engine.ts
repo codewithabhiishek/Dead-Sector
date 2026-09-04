@@ -58,6 +58,8 @@ interface Acid {
   vx: number;
   vy: number;
   life: number;
+  dmg: number;
+  big: boolean; // boss plasma orb
 }
 
 type PickupKind = "medkit" | "frenzy" | "power" | "shield" | "nuke";
@@ -249,6 +251,7 @@ export class Engine {
   private hitKillT = 0;
   private diffKey: Difficulty = "veteran";
   private surge = false;
+  private bossSpawned = false;
 
   // progression
   private score = 0;
@@ -682,6 +685,8 @@ export class Engine {
     this.shieldT = 0;
     this.wave = 0;
     this.intermission = -1;
+    this.bossSpawned = false;
+    this.surge = false;
     this.hurtT = 0;
     this.shakeT = 0;
   }
@@ -721,26 +726,41 @@ export class Engine {
   private startWave(n: number) {
     this.wave = n;
     const isBoss = n % 5 === 0;
+    const patriarch = isBoss && n >= 10;
+    this.bossSpawned = false;
     this.surge = !isBoss && n >= 7 && n % 7 === 0;
-    let total = Math.min(95, Math.floor((6 + n * 3.2 + Math.pow(n, 1.24)) * DIFFS[this.diffKey].count));
-    if (isBoss) total = Math.max(6, Math.floor(total * 0.55));
+    const total = this.waveCount(n);
     this.toSpawn = total;
     this.spawnT = 1.1;
     this.intermission = -1;
     sfx.waveHorn(isBoss || this.surge);
     const title = isBoss
-      ? "ABOMINATION DETECTED"
+      ? patriarch
+        ? "THE PATRIARCH AWAKENS"
+        : "ABOMINATION DETECTED"
       : this.surge
         ? "MUTATION SURGE"
-        : n >= 10
-          ? `WAVE ${n} — NIGHTFALL`
-          : `WAVE ${n}`;
+        : n <= 10
+          ? `WAVE ${n} / 10`
+          : `OVERTIME — WAVE ${n}`;
     const sub = isBoss
-      ? "MASSIVE SIGNATURE — BRACE"
+      ? patriarch
+        ? "FINAL ASSAULT — IT SHOOTS BACK"
+        : "MASSIVE SIGNATURE — IT SHOOTS BACK"
       : this.surge
         ? `${total} MUTATED HOSTILES — FAST & TOXIC`
-        : `${total} HOSTILES INBOUND`;
+        : n > 10
+          ? `${total} HOSTILES — ENDLESS PROTOCOL · ×1.5 SCORE`
+          : `${total} HOSTILES INBOUND`;
     this.banner(title, sub, isBoss || this.surge ? "blood" : "toxic");
+  }
+
+  private waveCount(n: number): number {
+    // waves 5-7 bite noticeably harder, pressure keeps climbing after
+    const mid = n >= 5 ? 1 + (Math.min(n, 12) - 4) * 0.08 : 1;
+    let total = Math.min(95, Math.floor((6 + n * 3.2 + Math.pow(n, 1.24)) * DIFFS[this.diffKey].count * mid));
+    if (n % 5 === 0) total = Math.max(6, Math.floor(total * 0.55));
+    return total;
   }
 
   private banner(text: string, sub: string, tone: BannerMsg["tone"]) {
@@ -750,8 +770,9 @@ export class Engine {
 
   private hpScale() {
     const linear = 1 + (this.wave - 1) * 0.2;
-    // exponential bite after wave 10 — levels keep getting meaner
-    return this.wave > 10 ? linear * Math.pow(1.07, this.wave - 10) : linear;
+    // waves 5-7 ramp hard, everything past wave 10 keeps compounding
+    const mid = this.wave >= 5 ? Math.pow(1.06, Math.min(this.wave, 10) - 4) : 1;
+    return this.wave > 10 ? linear * mid * Math.pow(1.07, this.wave - 10) : linear * mid;
   }
 
   private spdScale() {
@@ -798,17 +819,22 @@ export class Engine {
         return { ...base, kind, r: 12, hp: 30 * hs, maxHp: 30 * hs, speed: rand(55, 68) * ss, dmg: 5 * ds, score: 25 };
       case "brute":
         return { ...base, kind, r: 24, hp: 150 * hs, maxHp: 150 * hs, speed: rand(34, 42) * ss, dmg: 22 * ds, score: 60 };
-      case "boss":
+      case "boss": {
+        const patriarch = this.wave >= 10;
+        const bhp = patriarch
+          ? 1700 * (1 + (Math.floor(this.wave / 10) - 1) * 0.5)
+          : 950 * (1 + (this.wave / 5 - 1) * 0.4);
         return {
           ...base,
           kind,
-          r: 44,
-          hp: 950 * (1 + (this.wave / 5 - 1) * 0.4) * D.hp,
-          maxHp: 950 * (1 + (this.wave / 5 - 1) * 0.4) * D.hp,
-          speed: 32 * ss,
-          dmg: 30 * ds,
+          r: patriarch ? 50 : 44,
+          hp: bhp * D.hp,
+          maxHp: bhp * D.hp,
+          speed: (patriarch ? 38 : 32) * ss,
+          dmg: (patriarch ? 36 : 30) * ds,
           score: 500,
         };
+      }
       default:
         return { ...base, kind, r: 14, hp: 26 * hs, maxHp: 26 * hs, speed: rand(52, 72) * ss, dmg: 8 * ds, score: 10 };
     }
@@ -1393,24 +1419,27 @@ export class Engine {
       }
     } else if (this.zombies.length === 0) {
       // wave cleared
-      const heal = 10;
+      const cleared = this.wave;
+      const heal = cleared >= 10 ? 40 : 10;
       this.hp = Math.min(this.maxHp, this.hp + heal);
       this.stamina = 100;
-      this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
+      if (cleared === 10) {
+        this.banner("SECTOR PURGED", "ALL 10 WAVES CLEARED — OVERTIME: ENDLESS · ×1.5 SCORE", "toxic");
+      } else {
+        this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
+      }
       sfx.waveClear();
-      this.intermission = 3.0;
+      this.intermission = cleared === 10 ? 4 : 3;
     }
-    // spawn boss alongside wave 5,10,...
-    if (this.wave % 5 === 0 && !this.boss && this.toSpawn <= Math.floor(this.toSpawnInit() / 2)) {
+    // spawn boss alongside wave 5,10,... — exactly ONE per wave
+    if (this.wave % 5 === 0 && !this.bossSpawned && !this.boss && this.toSpawn <= Math.floor(this.toSpawnInit() / 2)) {
       this.spawnBoss();
+      this.bossSpawned = true;
     }
   }
 
   private toSpawnInit(): number {
-    const n = this.wave;
-    let total = Math.min(95, Math.floor((6 + n * 3.2 + Math.pow(n, 1.24)) * DIFFS[this.diffKey].count));
-    if (n % 5 === 0) total = Math.max(6, Math.floor(total * 0.55));
-    return total;
+    return this.waveCount(this.wave);
   }
 
   private updateZombies(dt: number, noPlayer: boolean) {
@@ -1464,13 +1493,55 @@ export class Engine {
         if (z.spitT <= 0 && pd < 620 && !this.dead) {
           z.spitT = rand(1.9, 2.7);
           const a = Math.atan2(this.py - z.y, this.px - z.x) + rand(-0.12, 0.12);
-          this.acids.push({ x: z.x, y: z.y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, life: 2.6 });
+          this.acids.push({ x: z.x, y: z.y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, life: 2.6, dmg: 10 * DIFFS[this.diffKey].dmg, big: false });
           sfx.spit();
           z.lungeT = 0.2;
         }
       } else {
         z.x += dirX * z.speed * dt;
         z.y += dirY * z.speed * dt;
+      }
+
+      // boss plasma volley — deadly at range, hits harder than spitter acid
+      if (z.kind === "boss" && !noPlayer && !this.dead) {
+        z.spitT -= dt;
+        const pd = Math.hypot(this.px - z.x, this.py - z.y) || 1;
+        if (z.spitT <= 0 && pd < 980) {
+          const patriarch = this.wave >= 10;
+          const n = patriarch ? 7 : 5;
+          const baseA = Math.atan2(this.py - z.y, this.px - z.x);
+          const spread = patriarch ? 0.66 : 0.5;
+          const dd = DIFFS[this.diffKey].dmg;
+          for (let i = 0; i < n; i++) {
+            const a = baseA + (i - (n - 1) / 2) * (spread / Math.max(1, n - 1));
+            this.acids.push({
+              x: z.x,
+              y: z.y,
+              vx: Math.cos(a) * rand(300, 355),
+              vy: Math.sin(a) * rand(300, 355),
+              life: 2.6,
+              dmg: (patriarch ? 20 : 15) * dd,
+              big: true,
+            });
+          }
+          sfx.plasma();
+          this.addShake(4, 0.16);
+          z.lungeT = 0.25;
+          z.spitT = patriarch ? rand(1.7, 2.1) : rand(2.2, 2.7);
+          // the Patriarch calls reinforcements
+          if (patriarch && this.zombies.length < 70 && Math.random() < 0.45) {
+            for (let i = 0; i < 2; i++) {
+              const sa = rand(0, Math.PI * 2);
+              const np = this.collideObs(
+                clamp(z.x + Math.cos(sa) * 70, 20, WORLD_W - 20),
+                clamp(z.y + Math.sin(sa) * 70, 20, WORLD_H - 20),
+                11
+              );
+              this.zombies.push(this.makeZombie("runner", np.x, np.y, 1));
+            }
+            this.floatLabel(z.x, z.y - z.r - 22, "REINFORCEMENTS", "#ff4b52");
+          }
+        }
       }
 
       // collide with the world
@@ -1592,10 +1663,12 @@ export class Engine {
         a.life = 0;
         continue;
       }
-      if (!this.dead && dist2(a.x, a.y, this.px, this.py) < 20 * 20) {
-        this.damagePlayer(10, a.x, a.y, false);
+      const hitR = a.big ? 27 : 20;
+      if (!this.dead && dist2(a.x, a.y, this.px, this.py) < hitR * hitR) {
+        this.damagePlayer(a.dmg, a.x, a.y, a.big);
         sfx.acidHit();
         this.acidSplat(a.x, a.y);
+        if (a.big) this.addShake(6, 0.2);
         a.life = 0;
       }
     }
@@ -1750,7 +1823,7 @@ export class Engine {
       this.floatLabel(z.x, z.y - 20, `KILL STREAK ×${this.combo}`, "#d4ff4d");
     }
     const mult = 1 + Math.min(this.combo, 40) * 0.1;
-    const gained = Math.round(z.score * mult * DIFFS[this.diffKey].score);
+    const gained = Math.round(z.score * mult * DIFFS[this.diffKey].score * (this.wave > 10 ? 1.5 : 1));
     this.score += gained;
     this.texts.push({
       x: z.x,
@@ -1967,7 +2040,10 @@ export class Engine {
       stamina: this.stamina,
       sprinting: this.sprinting,
       buffs: { frenzy: this.frenzyT, power: this.powerT, shield: this.shieldT },
-      boss: this.boss && !this.boss.dead ? { name: "THE ABOMINATION", frac: clamp(this.boss.hp / this.boss.maxHp, 0, 1) } : null,
+      boss:
+        this.boss && !this.boss.dead
+          ? { name: this.wave >= 10 ? "THE PATRIARCH" : "THE ABOMINATION", frac: clamp(this.boss.hp / this.boss.maxHp, 0, 1) }
+          : null,
       hurt: this.hurtT,
       lowHp: this.hp > 0 && this.hp < 30,
       time: this.runT,
@@ -2826,6 +2902,31 @@ export class Engine {
 
   private drawAcids(c: CanvasRenderingContext2D) {
     for (const a of this.acids) {
+      if (a.big) {
+        // boss plasma orb — burning core + motion trail
+        const tx = a.x - a.vx * 0.03;
+        const ty = a.y - a.vy * 0.03;
+        c.strokeStyle = "rgba(255,107,61,0.35)";
+        c.lineWidth = 7;
+        c.beginPath();
+        c.moveTo(tx, ty);
+        c.lineTo(a.x, a.y);
+        c.stroke();
+        const pulse = 1 + Math.sin(this.time * 24 + a.x) * 0.12;
+        c.fillStyle = "rgba(255,107,61,0.3)";
+        c.beginPath();
+        c.arc(a.x, a.y, 13 * pulse, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "#ff6b3d";
+        c.beginPath();
+        c.arc(a.x, a.y, 8 * pulse, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "#ffd166";
+        c.beginPath();
+        c.arc(a.x - 2, a.y - 2, 3.4, 0, Math.PI * 2);
+        c.fill();
+        continue;
+      }
       c.fillStyle = "rgba(168,230,46,0.3)";
       c.beginPath();
       c.arc(a.x, a.y, 9, 0, Math.PI * 2);

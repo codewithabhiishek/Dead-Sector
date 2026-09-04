@@ -127,6 +127,12 @@ export class SoundEngine {
     this.tone("square", 1250, 950, 0.035, 0.045);
   }
 
+  plasma(): void {
+    this.tone("sawtooth", 150, 55, 0.3, 0.26);
+    this.noise(0.24, 520, 0.18, 1, 140);
+    this.tone("square", 90, 45, 0.28, 0.2, 0.03);
+  }
+
   killTick(): void {
     this.tone("square", 880, 1320, 0.06, 0.08);
     this.tone("square", 1760, 1760, 0.05, 0.045, 0.03);

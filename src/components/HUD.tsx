@@ -150,7 +150,9 @@ function ScorePanel({ s }: { s: Snapshot }) {
       )}
       <div className="hud-panel chamfer-sm px-3 py-2 min-w-[170px]">
         <div className="flex items-center justify-between gap-4">
-          <span className="stencil text-[10px] text-toxic/80">Wave {s.wave}</span>
+          <span className="stencil text-[10px] text-toxic/80">
+            {s.wave <= 10 ? `Wave ${s.wave} / 10` : `Wave ${s.wave} · OT`}
+          </span>
           <span className="flex items-center gap-1.5 text-[11px] font-bold text-bone/70 tabular-nums">
             <Skull className="w-3.5 h-3.5 text-blood" />
             {s.left} LEFT
