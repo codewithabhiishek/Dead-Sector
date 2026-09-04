@@ -112,6 +112,68 @@ body {
   text-transform: uppercase;
 }
 
+/* ---------- mission select cells ---------- */
+.wave-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 64px;
+  color: #cfe0b8;
+  background: linear-gradient(180deg, rgba(24, 34, 20, 0.78), rgba(10, 15, 9, 0.88));
+  border: 1px solid rgba(163, 245, 46, 0.22);
+  border-radius: 3px;
+  transition:
+    transform 0.12s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+.wave-cell:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(163, 245, 46, 0.55);
+  color: #eaffd0;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(163, 245, 46, 0.12);
+}
+.wave-cell:not(:disabled):active {
+  transform: translateY(0) scale(0.97);
+}
+.wave-cell:disabled {
+  color: rgba(232, 224, 200, 0.25);
+  border-color: rgba(232, 224, 200, 0.1);
+  background: rgba(0, 0, 0, 0.32);
+  cursor: not-allowed;
+}
+.wave-cell.is-active {
+  color: #d4ff4d;
+  border-color: rgba(212, 255, 77, 0.85);
+  background: linear-gradient(180deg, rgba(40, 58, 26, 0.92), rgba(16, 24, 12, 0.94));
+  box-shadow:
+    0 0 20px rgba(163, 245, 46, 0.3),
+    inset 0 0 12px rgba(163, 245, 46, 0.12);
+}
+.wave-cell.is-boss:not(:disabled) {
+  border-color: rgba(229, 34, 46, 0.4);
+}
+.wave-cell.is-boss:not(:disabled):hover {
+  border-color: rgba(255, 75, 82, 0.7);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(229, 34, 46, 0.16);
+}
+.wave-cell.is-boss.is-active {
+  color: #ffb3b3;
+  border-color: rgba(255, 75, 82, 0.9);
+  background: linear-gradient(180deg, rgba(64, 20, 22, 0.92), rgba(24, 8, 10, 0.94));
+  box-shadow:
+    0 0 20px rgba(229, 34, 46, 0.32),
+    inset 0 0 12px rgba(229, 34, 46, 0.14);
+}
+
 /* ---------- key caps ---------- */
 .keycap {
   display: inline-flex;

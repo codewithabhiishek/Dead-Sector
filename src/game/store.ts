@@ -68,6 +68,7 @@ export interface Snapshot {
   muted: boolean;
   waveClearHeal: boolean;
   difficulty: Difficulty;
+  unlocked: number; // highest selectable wave (progress)
 }
 
 const defaultSnap: Snapshot = {
@@ -104,6 +105,7 @@ const defaultSnap: Snapshot = {
   muted: false,
   waveClearHeal: false,
   difficulty: "veteran",
+  unlocked: loadUnlocked(),
 };
 
 type Listener = () => void;
@@ -178,6 +180,23 @@ export function loadDifficulty(): Difficulty {
 export function saveDifficulty(d: Difficulty): void {
   try {
     localStorage.setItem("ds_difficulty", d);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadUnlocked(): number {
+  try {
+    const v = Number(localStorage.getItem("ds_unlocked") ?? 1);
+    return Number.isFinite(v) && v >= 1 ? Math.floor(v) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function saveUnlocked(w: number): void {
+  try {
+    localStorage.setItem("ds_unlocked", String(w));
   } catch {
     /* ignore */
   }

@@ -8,6 +8,8 @@ import {
   saveMuted,
   loadDifficulty,
   saveDifficulty,
+  loadUnlocked,
+  saveUnlocked,
   type BannerMsg,
   type Difficulty,
 } from "./store";
@@ -155,6 +157,8 @@ const WEAPONS: Weapon[] = [
   { name: "ARC-9 RAILGUN", dmg: 96, rof: 2.1, mag: 6, reload: 1.7, pellets: 1, spread: 0.008, speed: 1700, pierce: 99, kick: 7 },
 ];
 const TIER_AT = [0, 12, 35, 75, 140, 220, 330]; // kills needed for tier index
+// weapon a fresh deployment starts with when inserting directly into a later wave
+const START_TIER = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6];
 
 const COMBO_WINDOW = 2.2;
 
@@ -258,6 +262,7 @@ export class Engine {
   private diffKey: Difficulty = "veteran";
   private surge = false;
   private bossSpawned = false;
+  private deadWave = 1;
 
   // progression
   private score = 0;
@@ -486,7 +491,10 @@ export class Engine {
     }
     if (c === "Enter" || c === "Space") {
       if (this.phase === "menu" || this.phase === "gameover") {
-        if (c === "Enter" || (c === "Space" && this.phase === "gameover")) this.start();
+        if (c === "Enter" || (c === "Space" && this.phase === "gameover")) {
+          // quick-deploy: menu continues from latest progress, game over retries the fallen wave
+          this.start(this.phase === "gameover" ? this.deadWave : loadUnlocked());
+        }
         return;
       }
     }
@@ -566,14 +574,30 @@ export class Engine {
 
   /* ------------------------------ public API ------------------------------ */
 
-  start() {
+  start(fromWave = 1) {
     sfx.unlock();
     sfx.ui();
     this.reset();
     this.phase = "playing";
     sfx.startDrone();
-    this.startWave(1);
+    const w0 = clamp(Math.round(fromWave), 1, 999);
+    // inserting mid-campaign: arm the operator for that wave
+    if (w0 > 1) {
+      const t = START_TIER[Math.min(w0, 11) - 1];
+      this.tier = t;
+      this.ammo = WEAPONS[t].mag;
+      this.reloadT = -1;
+      this.banner("DEPLOYED", `${WEAPONS[t].name} · WAVE ${w0}`, "toxic");
+    }
+    this.startWave(w0);
     this.syncHud(true);
+  }
+
+  private bumpUnlocked(n: number) {
+    if (n > loadUnlocked()) {
+      saveUnlocked(n);
+      store.set({ unlocked: n });
+    }
   }
 
   pause() {
@@ -1468,6 +1492,7 @@ export class Engine {
         this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
       }
       sfx.waveClear();
+      this.bumpUnlocked(cleared + 1);
       this.intermission = cleared === 10 ? 4 : 3;
     }
     // spawn boss alongside wave 5,10,... — exactly ONE per wave
@@ -2029,6 +2054,9 @@ export class Engine {
     const { best, bestWave } = loadBest();
     const newBest = this.score > best;
     saveBest(this.score, this.wave);
+    // the wave you fell on stays selectable — no forced restart from zero
+    this.deadWave = this.wave;
+    this.bumpUnlocked(this.wave);
     const stats = {
       score: this.score,
       wave: this.wave,

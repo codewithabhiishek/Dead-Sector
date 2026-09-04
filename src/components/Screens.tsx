@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useSnap } from "./HUD";
 import type { Engine } from "../game/engine";
 import { DIFFS } from "../game/engine";
@@ -12,6 +12,22 @@ function SkullIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M12 2C7 2 3.5 5.7 3.5 10.4c0 2.7 1.3 4.7 3 6v3.1c0 .8.7 1.5 1.5 1.5h1v-2h1.5v2h3v-2H15v2h1c.8 0 1.5-.7 1.5-1.5v-3.1c1.7-1.3 3-3.3 3-6C20.5 5.7 17 2 12 2zM8.7 13.2a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6.6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM12 14l1.3 2.6h-2.6L12 14z" />
+    </svg>
+  );
+}
+
+function LockIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3H9zm3 4a1.5 1.5 0 0 1 .75 2.8V19h-1.5v-2.2A1.5 1.5 0 0 1 12 14z" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 12.5 9.5 18 20 6.5" />
     </svg>
   );
 }
@@ -89,6 +105,15 @@ function ThreatPips({ level }: { level: number }) {
 
 export function MenuScreen({ engine }: ScreenProps) {
   const s = useSnap();
+  const [sel, setSel] = useState(() => Math.min(s.unlocked, 10));
+  const prevUnlocked = useRef(s.unlocked);
+  // when progress advances (returning from a run), snap selection to the newest wave
+  useEffect(() => {
+    if (s.unlocked > prevUnlocked.current) {
+      prevUnlocked.current = s.unlocked;
+      setSel(Math.min(s.unlocked, 10));
+    }
+  }, [s.unlocked]);
   if (s.phase !== "menu") return null;
 
   const controls: { label: string; keys: string[]; desc: string }[] = [
@@ -140,8 +165,57 @@ export function MenuScreen({ engine }: ScreenProps) {
           horde — <span className="text-acid font-bold">survive all 10 waves.</span>
         </p>
 
+        {/* mission select */}
+        <section className="mt-8 w-full max-w-[560px] rise-in rise-in-2" aria-label="Mission select">
+          <div className="flex items-center justify-between mb-2 px-0.5">
+            <span className="stencil text-[9px] text-bone/45">Mission Select</span>
+            <span className="stencil text-[9px] text-bone/30 tabular-nums">
+              Progress · Wave {Math.min(s.unlocked, 10)}/10 unlocked
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((w) => {
+              const locked = w > s.unlocked;
+              const boss = w % 5 === 0;
+              const cleared = w < s.unlocked;
+              const active = sel === w;
+              return (
+                <button
+                  key={w}
+                  disabled={locked}
+                  onClick={() => setSel(w)}
+                  aria-pressed={active}
+                  className={`wave-cell ${active ? "is-active" : ""} ${boss ? "is-boss" : ""}`}
+                  title={locked ? `Locked — clear wave ${w - 1} first` : `Deploy into wave ${w}`}
+                >
+                  <span className="stencil text-[7px] opacity-70">Wave</span>
+                  <span className="text-xl font-extrabold leading-none tabular-nums">
+                    {String(w).padStart(2, "0")}
+                  </span>
+                  <span className="h-4 grid place-items-center">
+                    {locked ? (
+                      <LockIcon className="w-3 h-3" />
+                    ) : boss ? (
+                      <SkullIcon className="w-3.5 h-3.5" />
+                    ) : cleared ? (
+                      <CheckIcon className="w-3 h-3" />
+                    ) : (
+                      <span className="w-1 h-1 bg-current rounded-full" />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2.5 text-center stencil text-[9px] text-bone/50">
+            {sel % 5 === 0
+              ? `Warning — boss signature detected on wave ${sel}`
+              : `Insertion point · wave ${sel} — armament scales with wave`}
+          </p>
+        </section>
+
         {/* difficulty selector */}
-        <section className="mt-8 w-full max-w-[432px] rise-in rise-in-2" aria-label="Difficulty selection">
+        <section className="mt-6 w-full max-w-[432px] rise-in rise-in-3" aria-label="Difficulty selection">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <span className="stencil text-[9px] text-bone/45">Select Difficulty</span>
             <span className="stencil text-[9px] text-bone/30">03 Protocols</span>
@@ -170,9 +244,9 @@ export function MenuScreen({ engine }: ScreenProps) {
         </section>
 
         {/* deploy + sound — aligned row */}
-        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px] gap-2 rise-in rise-in-3">
-          <button onClick={() => engine?.start()} className="btn-deploy h-[56px] text-[15px] sm:text-base">
-            Deploy
+        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px] gap-2 rise-in rise-in-4">
+          <button onClick={() => engine?.start(sel)} className="btn-deploy h-[56px] text-[15px] sm:text-base">
+            {sel === 1 ? "Deploy" : sel === Math.min(s.unlocked, 10) && s.unlocked > 1 ? `Continue · Wave ${sel}` : `Deploy · Wave ${sel}`}
             <PlayIcon className="w-4 h-4" />
           </button>
           <button
@@ -354,14 +428,16 @@ export function GameOverScreen({ engine }: ScreenProps) {
           </div>
 
           <div className="mt-6 grid grid-cols-[1fr_auto] gap-2">
-            <button onClick={() => engine?.start()} className="btn-primary py-3.5 text-sm">
-              <CrosshairIcon /> Redeploy
+            <button onClick={() => engine?.start(s.wave)} className="btn-primary py-3.5 text-sm">
+              <CrosshairIcon /> Retry Wave {s.wave}
             </button>
             <button onClick={() => engine?.toMenu()} className="btn-ghost px-5 text-[12px]">
               Menu
             </button>
           </div>
-          <div className="mt-4 stencil text-[9px] text-bone/30">Press Enter to redeploy</div>
+          <div className="mt-4 stencil text-[9px] text-bone/30">
+            Press Enter to retry wave {s.wave} · progress is saved to mission select
+          </div>
         </div>
       </div>
     </div>
