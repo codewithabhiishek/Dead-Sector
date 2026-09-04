@@ -43,6 +43,9 @@ interface Zombie {
   burnT: number; // incinerator burn time remaining
   burnDps: number;
   dead: boolean;
+  drop75?: boolean;
+  drop50?: boolean;
+  drop25?: boolean;
 }
 
 interface Bullet {
@@ -150,15 +153,15 @@ interface GoreDecal {
 const WEAPONS: Weapon[] = [
   { name: "M9 SIDEARM", dmg: 13, rof: 4.4, mag: 12, reload: 0.85, pellets: 1, spread: 0.05, speed: 820, pierce: 0, kick: 2.2 },
   { name: "VECTOR SMG", dmg: 9, rof: 11.5, mag: 34, reload: 1.05, pellets: 1, spread: 0.1, speed: 860, pierce: 0, kick: 1.5 },
-  { name: "RIOT SHOTGUN", dmg: 10, rof: 2.7, mag: 6, reload: 1.35, pellets: 6, spread: 0.3, speed: 740, pierce: 0, kick: 6 },
+  { name: "COMBAT SHOTGUN", dmg: 16, rof: 3.4, mag: 10, reload: 1.1, pellets: 8, spread: 0.22, speed: 880, pierce: 1, kick: 7.5 },
   { name: "AK-74 RIFLE", dmg: 17, rof: 7.6, mag: 30, reload: 1.2, pellets: 1, spread: 0.05, speed: 940, pierce: 1, kick: 2.4 },
   { name: "M134 MINIGUN", dmg: 11, rof: 16.5, mag: 140, reload: 2.0, pellets: 1, spread: 0.14, speed: 900, pierce: 1, kick: 1.2 },
-  { name: "M6 INCINERATOR", dmg: 13, rof: 3.2, mag: 8, reload: 1.5, pellets: 6, spread: 0.34, speed: 640, pierce: 0, kick: 5 },
+  { name: "M6 INCINERATOR", dmg: 18, rof: 4.2, mag: 16, reload: 1.2, pellets: 8, spread: 0.3, speed: 760, pierce: 2, kick: 5.5 },
   { name: "ARC-9 RAILGUN", dmg: 96, rof: 2.1, mag: 6, reload: 1.7, pellets: 1, spread: 0.008, speed: 1700, pierce: 99, kick: 7 },
 ];
-const TIER_AT = [0, 12, 35, 75, 140, 220, 330]; // kills needed for tier index
+const TIER_AT = [0, 10, 26, 55, 100, 160, 240]; // kills needed for tier index
 // weapon a fresh deployment starts with when inserting directly into a later wave
-const START_TIER = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6];
+const START_TIER = [0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6];
 
 const COMBO_WINDOW = 2.2;
 
@@ -263,6 +266,7 @@ export class Engine {
   private surge = false;
   private bossSpawned = false;
   private deadWave = 1;
+  private supplyTimer = 14;
 
   // progression
   private score = 0;
@@ -797,6 +801,12 @@ export class Engine {
           ? `${total} HOSTILES — ENDLESS PROTOCOL · ×1.5 SCORE`
           : `${total} HOSTILES INBOUND`;
     this.banner(title, sub, isBoss || this.surge ? "blood" : "toxic");
+    if (n >= 10) {
+      // Free emergency tactical supply drop to gear up for Patriarch
+      this.hp = Math.min(this.maxHp, this.hp + 40);
+      this.dropSupplyAirdrop(false);
+      this.supplyTimer = 14;
+    }
   }
 
   private waveCount(n: number): number {
@@ -868,16 +878,16 @@ export class Engine {
       case "boss": {
         const patriarch = this.wave >= 10;
         const bhp = patriarch
-          ? 1700 * (1 + (Math.floor(this.wave / 10) - 1) * 0.5)
-          : 950 * (1 + (this.wave / 5 - 1) * 0.4);
+          ? 1300 * (1 + (Math.floor(this.wave / 10) - 1) * 0.45)
+          : 900 * (1 + (this.wave / 5 - 1) * 0.35);
         return {
           ...base,
           kind,
-          r: patriarch ? 50 : 44,
+          r: patriarch ? 48 : 44,
           hp: bhp * D.hp,
           maxHp: bhp * D.hp,
-          speed: (patriarch ? 38 : 32) * ss,
-          dmg: (patriarch ? 36 : 30) * ds,
+          speed: (patriarch ? 36 : 32) * ss,
+          dmg: (patriarch ? 28 : 26) * ds,
           score: 500,
         };
       }
@@ -936,6 +946,9 @@ export class Engine {
     this.zombies.push(b);
     this.boss = b;
     this.addShake(10, 0.5);
+    if (this.wave >= 10) {
+      this.dropSupplyAirdrop(false);
+    }
   }
 
   /* ------------------------------ collision ------------------------------ */
@@ -1333,8 +1346,8 @@ export class Engine {
     const my = this.py + Math.sin(this.aim) * mOff;
     const dmgMul = this.powerT > 0 ? 1.75 : 1;
     const col =
-      this.tier === 6 ? "#7ce7ff" : this.tier === 5 ? "#ff8b3d" : this.tier === 2 ? "#ffcf8a" : "#ffe9a8";
-    const bw = this.tier === 6 ? 4 : this.tier === 5 ? 3.4 : this.tier === 2 ? 2.4 : 2;
+      this.tier === 6 ? "#7ce7ff" : this.tier === 5 ? "#ff8b3d" : this.tier === 2 ? "#ffd27d" : "#ffe9a8";
+    const bw = this.tier === 6 ? 4 : this.tier === 5 ? 3.4 : this.tier === 2 ? 2.8 : 2;
     for (let i = 0; i < w.pellets; i++) {
       const a = this.aim + rand(-spread, spread);
       const spd = w.speed * rand(0.92, 1.08);
@@ -1345,7 +1358,7 @@ export class Engine {
         vy: Math.sin(a) * spd,
         dmg: w.dmg * dmgMul * rand(0.9, 1.1),
         pierce: w.pierce,
-        life: this.tier === 5 ? 0.55 : 0.95,
+        life: this.tier === 5 ? 0.75 : 0.95,
         hitIds: new Set(),
         col,
         w: bw,
@@ -1422,10 +1435,34 @@ export class Engine {
           z.hp -= dmg;
           z.flashT = 0.09;
           const ka = Math.atan2(b.vy, b.vx);
+          // boss milestone supply drops (75%, 50%, 25% HP)
+          if (z.kind === "boss") {
+            const frac = z.hp / z.maxHp;
+            if (frac <= 0.75 && !z.drop75) {
+              z.drop75 = true;
+              this.dropPickup(z.x - 30, z.y, "medkit");
+              this.dropPickup(z.x + 30, z.y, "shield");
+              this.floatLabel(z.x, z.y - z.r - 20, "BOSS STAGGERED — SUPPLIES DROPPED", "#7dffa0");
+              this.addShake(8, 0.25);
+            } else if (frac <= 0.5 && !z.drop50) {
+              z.drop50 = true;
+              this.dropPickup(z.x - 35, z.y, "medkit");
+              this.dropPickup(z.x + 35, z.y, "power");
+              this.dropPickup(z.x, z.y + 35, "frenzy");
+              this.floatLabel(z.x, z.y - z.r - 20, "BOSS WEAKENED — TACTICAL CACHE DROPPED", "#ffd166");
+              this.addShake(10, 0.3);
+            } else if (frac <= 0.25 && !z.drop25) {
+              z.drop25 = true;
+              this.dropPickup(z.x - 30, z.y, "medkit");
+              this.dropPickup(z.x + 30, z.y, "nuke");
+              this.floatLabel(z.x, z.y - z.r - 20, "CRITICAL STATE — NUKE & MEDKIT DROPPED", "#ff4b52");
+              this.addShake(12, 0.35);
+            }
+          }
           // incinerator rounds ignite the target
           if (this.tier === 5) {
-            z.burnT = 2.2;
-            z.burnDps = 9 * (this.powerT > 0 ? 1.75 : 1);
+            z.burnT = 2.5;
+            z.burnDps = 14 * (this.powerT > 0 ? 1.75 : 1);
           }
           // railgun impact — cyan spark burst + shove
           if (b.w >= 4) {
@@ -1513,6 +1550,14 @@ export class Engine {
     if (this.wave % 5 === 0 && !this.bossSpawned && !this.boss && this.toSpawn <= Math.floor(this.toSpawnInit() / 2)) {
       this.spawnBoss();
       this.bossSpawned = true;
+    }
+    // Periodic emergency tactical airdrops during boss battle in Wave 10+
+    if (this.wave >= 10 && this.boss && !this.boss.dead) {
+      this.supplyTimer -= dt;
+      if (this.supplyTimer <= 0) {
+        this.supplyTimer = this.hp < 50 ? 12 : 16;
+        this.dropSupplyAirdrop(true);
+      }
     }
   }
 
@@ -1613,26 +1658,26 @@ export class Engine {
           const patriarch = this.wave >= 10;
           const n = patriarch ? 7 : 5;
           const baseA = Math.atan2(this.py - z.y, this.px - z.x);
-          const spread = patriarch ? 0.66 : 0.5;
+          const spread = patriarch ? 0.6 : 0.48;
           const dd = DIFFS[this.diffKey].dmg;
           for (let i = 0; i < n; i++) {
             const a = baseA + (i - (n - 1) / 2) * (spread / Math.max(1, n - 1));
             this.acids.push({
               x: z.x,
               y: z.y,
-              vx: Math.cos(a) * rand(300, 355),
-              vy: Math.sin(a) * rand(300, 355),
-              life: 2.6,
-              dmg: (patriarch ? 20 : 15) * dd,
+              vx: Math.cos(a) * rand(260, 310),
+              vy: Math.sin(a) * rand(260, 310),
+              life: 2.4,
+              dmg: (patriarch ? 14 : 12) * dd,
               big: true,
             });
           }
           sfx.plasma();
           this.addShake(4, 0.16);
           z.lungeT = 0.25;
-          z.spitT = patriarch ? rand(1.7, 2.1) : rand(2.2, 2.7);
+          z.spitT = patriarch ? rand(2.3, 2.9) : rand(2.5, 3.1);
           // the Patriarch calls reinforcements
-          if (patriarch && this.zombies.length < 70 && Math.random() < 0.45) {
+          if (patriarch && this.zombies.length < 50 && Math.random() < 0.32) {
             for (let i = 0; i < 2; i++) {
               const sa = rand(0, Math.PI * 2);
               const np = this.collideObs(
@@ -1793,11 +1838,13 @@ export class Engine {
 
   private applyPickup(p: Pickup) {
     switch (p.kind) {
-      case "medkit":
-        this.hp = Math.min(this.maxHp, this.hp + 32);
+      case "medkit": {
+        const heal = this.wave >= 10 ? 45 : 36;
+        this.hp = Math.min(this.maxHp, this.hp + heal);
         sfx.medkit();
-        this.floatLabel(p.x, p.y, "+32 HP", "#7dffa0");
+        this.floatLabel(p.x, p.y, `+${heal} HP`, "#7dffa0");
         break;
+      }
       case "frenzy":
         this.frenzyT = 8;
         sfx.pickup();
@@ -1834,7 +1881,8 @@ export class Engine {
   }
 
   private dropPickup(x: number, y: number, force?: PickupKind) {
-    if (this.pickups.length >= 7 && !force) return;
+    const maxPickups = this.wave >= 10 ? 18 : 8;
+    if (this.pickups.length >= maxPickups && !force) return;
     let kind: PickupKind;
     if (force) kind = force;
     else {
@@ -1859,7 +1907,49 @@ export class Engine {
     const res = this.collideObs(px, py, 16);
     px = res.x;
     py = res.y;
-    this.pickups.push({ kind, x: px, y: py, t: rand(0, 3), life: 16 });
+    this.pickups.push({ kind, x: px, y: py, t: rand(0, 3), life: this.wave >= 10 ? 28 : 16 });
+  }
+
+  private dropSupplyAirdrop(periodic = false) {
+    const cx = clamp(this.px + rand(-70, 70), 80, WORLD_W - 80);
+    const cy = clamp(this.py + rand(-70, 70), 80, WORLD_H - 80);
+
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      this.particles.push({
+        kind: "ring",
+        x: cx + Math.cos(a) * 20,
+        y: cy + Math.sin(a) * 20,
+        vx: Math.cos(a) * rand(40, 90),
+        vy: Math.sin(a) * rand(40, 90),
+        t: 0,
+        life: 1.2,
+        size: 14,
+        color: periodic ? "#6be3ff" : "#7dffa0",
+        rot: 0,
+        vr: 0,
+      });
+    }
+    this.addShake(6, 0.22);
+    sfx.nuke();
+
+    if (!periodic) {
+      this.dropPickup(cx - 38, cy - 15, "medkit");
+      this.dropPickup(cx + 38, cy - 15, "medkit");
+      this.dropPickup(cx, cy - 35, "shield");
+      this.dropPickup(cx - 20, cy + 25, "power");
+      this.dropPickup(cx + 20, cy + 25, "frenzy");
+      this.floatLabel(cx, cy, "AIRDROP DELIVERED", "#7dffa0");
+      this.banner("AIRDROP DELIVERED", "MEDKITS · SHIELDS · HOLLOW POINTS DEPLOYED", "toxic");
+    } else {
+      this.dropPickup(cx - 25, cy, "medkit");
+      this.dropPickup(cx + 25, cy, Math.random() < 0.5 ? "shield" : "power");
+      if (Math.random() < 0.35) {
+        this.dropPickup(cx, cy + 28, "nuke");
+      }
+      this.floatLabel(cx, cy, "EMERGENCY SUPPLY CRATE", "#6be3ff");
+      this.banner("EMERGENCY AIRDROP", "TACTICAL SUPPLIES DEPLOYED NEAR OPERATOR", "toxic");
+    }
   }
 
   /* ------------------------------ combat core ------------------------------ */
@@ -3039,7 +3129,7 @@ export class Engine {
         break;
       }
       case 2: {
-        // RIOT SHOTGUN — twin barrels + wooden pump
+        // COMBAT SHOTGUN — tactical twin barrels + heat shield pump
         c.fillStyle = dark;
         c.fillRect(2, -2.8, 7, 5.6);
         c.fillStyle = metal;

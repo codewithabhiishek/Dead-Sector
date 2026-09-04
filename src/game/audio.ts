@@ -94,9 +94,10 @@ export class SoundEngine {
       this.noise(0.24, 750, 0.32, 0.7, 240);
       this.tone("sawtooth", 130, 55, 0.2, 0.14);
     } else if (tier === 2) {
-      // shotgun boom
-      this.noise(0.16, 900, 0.5, 0.8, 200);
-      this.tone("square", 130, 50, 0.14, 0.3);
+      // shotgun boom - heavy tactical punch & deep sub-bass
+      this.noise(0.2, 1100, 0.6, 0.9, 140);
+      this.tone("square", 145, 42, 0.16, 0.36);
+      this.tone("sine", 85, 30, 0.2, 0.4);
     } else if (tier === 4) {
       this.noise(0.07, 1600, 0.3, 1.2, 500);
       this.tone("square", 220 + Math.random() * 40, 90, 0.06, 0.18);

@@ -51,10 +51,10 @@ As you eliminate hostiles, your combat tier advances automatically:
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
 | **0** | **M9 SIDEARM** | 13 | 4.4 rps | 12 | 0.85s | Reliable semi-auto sidearm with fast recovery |
 | **1** | **VECTOR SMG** | 9 | 11.5 rps | 34 | 1.05s | Blistering fire rate, shreds unarmored hordes |
-| **2** | **RIOT SHOTGUN** | 10×6 | 2.7 rps | 6 | 1.35s | Heavy close-quarters spread with devastating knockback |
+| **2** | **COMBAT SHOTGUN** | 16×8 | 3.4 rps | 10 | 1.10s | Piercing 8-pellet buckshot spread with frontline punch & sub-bass kick |
 | **3** | **AK-74 RIFLE** | 17 | 7.6 rps | 30 | 1.20s | High penetration bullet velocity with 1-target pierce |
 | **4** | **M134 MINIGUN** | 11 | 16.5 rps | 140 | 2.00s | Sustained suppression with immense magazine capacity |
-| **5** | **M6 INCINERATOR** | 13×6 | 3.2 rps | 8 | 1.50s | High-heat fragmentation blasts covering wide chokepoints |
+| **5** | **M6 INCINERATOR** | 18×8 | 4.2 rps | 16 | 1.20s | High-heat fragmentation pellets that ignite targets and melt dense swarms |
 | **6** | **ARC-9 RAILGUN** | 96 | 2.1 rps | 6 | 1.70s | Hyper-velocity slug that pierces through infinite hostiles |
 
 ---
