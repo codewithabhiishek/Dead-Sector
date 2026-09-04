@@ -50,6 +50,8 @@ interface Bullet {
   pierce: number;
   life: number;
   hitIds: Set<Zombie>;
+  col: string; // tracer color
+  w: number; // tracer width
 }
 
 interface Acid {
@@ -147,8 +149,10 @@ const WEAPONS: Weapon[] = [
   { name: "RIOT SHOTGUN", dmg: 10, rof: 2.7, mag: 6, reload: 1.35, pellets: 6, spread: 0.3, speed: 740, pierce: 0, kick: 6 },
   { name: "AK-74 RIFLE", dmg: 17, rof: 7.6, mag: 30, reload: 1.2, pellets: 1, spread: 0.05, speed: 940, pierce: 1, kick: 2.4 },
   { name: "M134 MINIGUN", dmg: 11, rof: 16.5, mag: 140, reload: 2.0, pellets: 1, spread: 0.14, speed: 900, pierce: 1, kick: 1.2 },
+  { name: "M6 INCINERATOR", dmg: 13, rof: 3.2, mag: 8, reload: 1.5, pellets: 6, spread: 0.34, speed: 640, pierce: 0, kick: 5 },
+  { name: "ARC-9 RAILGUN", dmg: 96, rof: 2.1, mag: 6, reload: 1.7, pellets: 1, spread: 0.008, speed: 1700, pierce: 99, kick: 7 },
 ];
-const TIER_AT = [0, 12, 35, 75, 140]; // kills needed for tier index
+const TIER_AT = [0, 12, 35, 75, 140, 220, 330]; // kills needed for tier index
 
 const COMBO_WINDOW = 2.2;
 
