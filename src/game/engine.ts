@@ -1799,12 +1799,20 @@ export class Engine {
     let kind: PickupKind;
     if (force) kind = force;
     else {
+      // medkits are the primary supply drop — and the horde drops them far
+      // more often while the operator is badly wounded
+      const lowHp = this.hp < this.maxHp * 0.45;
       const r = Math.random();
-      if (r < 0.013) kind = "nuke";
-      else if (r < 0.085) kind = "medkit";
-      else if (r < 0.135) kind = "frenzy";
-      else if (r < 0.185) kind = "power";
-      else if (r < 0.215) kind = "shield";
+      const pNuke = 0.012;
+      const pMed = lowHp ? 0.17 : 0.105;
+      const pFren = 0.05;
+      const pPow = 0.05;
+      const pShield = 0.03;
+      if (r < pNuke) kind = "nuke";
+      else if (r < pNuke + pMed) kind = "medkit";
+      else if (r < pNuke + pMed + pFren) kind = "frenzy";
+      else if (r < pNuke + pMed + pFren + pPow) kind = "power";
+      else if (r < pNuke + pMed + pFren + pPow + pShield) kind = "shield";
       else return;
     }
     let px = clamp(x, 40, WORLD_W - 40);
@@ -2823,10 +2831,10 @@ export class Engine {
   }
 
   private drawPlayer(c: CanvasRenderingContext2D) {
-    // ghosts
+    // ghosts — bone-colored afterimages, clearly the operator
     for (const g of this.ghosts) {
-      c.globalAlpha = g.a * 0.5;
-      c.fillStyle = "#a3f52e";
+      c.globalAlpha = g.a * 0.45;
+      c.fillStyle = "#e8e0c8";
       c.beginPath();
       c.arc(g.x, g.y, 13, 0, Math.PI * 2);
       c.fill();
@@ -2869,29 +2877,42 @@ export class Engine {
     this.drawGun(c);
     c.restore();
 
-    // body
+    // body — sand-khaki uniform, reads instantly against the green horde
     const bg = c.createRadialGradient(-4, -5, 2, 0, 0, 16);
-    bg.addColorStop(0, "#8ba168");
-    bg.addColorStop(1, "#4d5c38");
+    bg.addColorStop(0, "#d9c79c");
+    bg.addColorStop(1, "#8f7d55");
     c.fillStyle = bg;
     c.beginPath();
     c.arc(0, 0, 13, 0, Math.PI * 2);
     c.fill();
     c.lineWidth = 2;
-    c.strokeStyle = "rgba(0,0,0,0.5)";
+    c.strokeStyle = "rgba(38,28,12,0.6)";
     c.stroke();
-    // helmet
-    c.fillStyle = "#3f4d2e";
+    // chest rig
+    c.fillStyle = "#5a4f33";
+    c.fillRect(-6, -3, 12, 7);
+    c.fillStyle = "#3c3521";
+    c.fillRect(-6, -3, 12, 2);
+    // helmet — charcoal steel with bone-white visor
+    c.fillStyle = "#2b3238";
     c.beginPath();
     c.arc(0, 0, 8, 0, Math.PI * 2);
     c.fill();
-    c.strokeStyle = "rgba(212,255,77,0.5)";
+    c.strokeStyle = "rgba(0,0,0,0.5)";
     c.lineWidth = 1.5;
+    c.stroke();
+    c.strokeStyle = "rgba(255,255,255,0.85)";
+    c.lineWidth = 1.8;
     c.beginPath();
     c.arc(0, 0, 8, this.aim - 0.6, this.aim + 0.6);
     c.stroke();
+    // red shoulder insignia
+    c.fillStyle = "#e5222e";
+    c.beginPath();
+    c.arc(-Math.cos(this.aim + Math.PI / 2) * 10, -Math.sin(this.aim + Math.PI / 2) * 10, 2.2, 0, Math.PI * 2);
+    c.fill();
     // hands
-    c.fillStyle = "#c9a06a";
+    c.fillStyle = "#e3b98d";
     const hx = Math.cos(this.aim) * 12;
     const hy = Math.sin(this.aim) * 12;
     const perp = this.aim + Math.PI / 2;
