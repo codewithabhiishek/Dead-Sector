@@ -54,6 +54,8 @@ export interface Snapshot {
   comboMult: number;
   comboFrac: number; // 0..1 time remaining
   dashFrac: number; // 0..1 readiness
+  stamina: number; // 0..100
+  sprinting: boolean;
   buffs: Buffs;
   boss: BossHud | null;
   hurt: number; // 0..1 red flash
@@ -87,6 +89,8 @@ const defaultSnap: Snapshot = {
   comboMult: 1,
   comboFrac: 0,
   dashFrac: 1,
+  stamina: 100,
+  sprinting: false,
   buffs: { frenzy: 0, power: 0, shield: 0 },
   boss: null,
   hurt: 0,

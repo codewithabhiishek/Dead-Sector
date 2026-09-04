@@ -137,7 +137,7 @@ export function MenuScreen({ engine }: ScreenProps) {
             <Drips />
           </h1>
           <p className="mt-7 text-[13px] md:text-sm text-bone/60 max-w-md mx-auto font-medium tracking-wide">
-            The wire is breached. Hold the containment field, chain your kills,
+            The wire is breached. Run the open sector, use the wrecks for cover,
             and out-gun the horde — <span className="text-acid font-bold">every wave is worse than the last.</span>
           </p>
         </div>
@@ -164,7 +164,8 @@ export function MenuScreen({ engine }: ScreenProps) {
             <div className="stencil text-[10px] text-toxic/80 mb-2 flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-toxic inline-block" /> Field Manual
             </div>
-            <ControlsRow keys={["W", "A", "S", "D"]} label="Move" />
+            <ControlsRow keys={["W", "A", "S", "D"]} label="Move through the sector" />
+            <ControlsRow keys={["SHIFT"]} label="Sprint (drains stamina)" />
             <ControlsRow keys={["MOUSE"]} label="Aim · hold LMB to fire" />
             <ControlsRow keys={["SPACE"]} label="Combat dash (i-frames)" />
             <ControlsRow keys={["R"]} label="Reload" />
@@ -300,6 +301,7 @@ export function GameOverScreen({ engine }: ScreenProps) {
 export function TouchControls({ engine }: ScreenProps) {
   const s = useSnap();
   const [joy, setJoy] = useState<{ ox: number; oy: number; dx: number; dy: number } | null>(null);
+  const [sprintOn, setSprintOn] = useState(false);
   const zoneRef = useRef<HTMLDivElement>(null);
   if (!engine?.isTouch || (s.phase !== "playing" && s.phase !== "paused")) return null;
 
@@ -365,6 +367,16 @@ export function TouchControls({ engine }: ScreenProps) {
           onPointerDown={() => engine.dashAction()}
         >
           Dash
+        </button>
+        <button
+          className={`chamfer-sm px-5 py-3 text-[12px] ${sprintOn ? "btn-primary" : "btn-ghost"}`}
+          onPointerDown={() => {
+            const next = !sprintOn;
+            setSprintOn(next);
+            engine.setTouchSprint(next);
+          }}
+        >
+          {sprintOn ? "Sprint ●" : "Sprint"}
         </button>
         <button
           className="btn-primary chamfer w-24 h-24 rounded-full! text-sm"

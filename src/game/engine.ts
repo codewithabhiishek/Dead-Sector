@@ -1,4 +1,4 @@
-/* DEAD SECTOR — canvas game engine. All visuals procedural, no image assets. */
+/* DEAD SECTOR — canvas game engine. Scrolling world, camera follow, all visuals procedural. */
 
 import { store, loadBest, saveBest, loadMuted, saveMuted, type BannerMsg } from "./store";
 import { sfx } from "./audio";
@@ -25,6 +25,7 @@ interface Zombie {
   lungeT: number;
   spitT: number;
   waypoint: { x: number; y: number } | null;
+  waypointT: number;
   dead: boolean;
 }
 
@@ -58,7 +59,7 @@ interface Pickup {
 }
 
 interface Particle {
-  kind: "blood" | "spark" | "shell" | "smoke" | "chunk" | "ring" | "acid";
+  kind: "blood" | "spark" | "shell" | "smoke" | "chunk" | "ring" | "acid" | "dust";
   x: number;
   y: number;
   vx: number;
@@ -95,16 +96,56 @@ interface Weapon {
   kick: number;
 }
 
+type ObsKind = "building" | "container" | "car" | "barrier" | "sandbag" | "crate";
+
+interface Obs {
+  kind: ObsKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  low: boolean;
+  col: string;
+  col2: string;
+  fire: boolean;
+  fireT: number;
+  seed: number;
+}
+
+interface Decal {
+  k: "grass" | "crater" | "crack" | "rubble" | "oil" | "bone";
+  x: number;
+  y: number;
+  r: number;
+  pts?: number[];
+}
+
+interface GoreDecal {
+  x: number;
+  y: number;
+  r: number;
+  c: string;
+}
+
 const WEAPONS: Weapon[] = [
-  { name: "M9 SIDEARM", dmg: 13, rof: 4.4, mag: 12, reload: 0.85, pellets: 1, spread: 0.05, speed: 800, pierce: 0, kick: 2.2 },
-  { name: "VECTOR SMG", dmg: 9, rof: 11.5, mag: 34, reload: 1.05, pellets: 1, spread: 0.1, speed: 840, pierce: 0, kick: 1.5 },
-  { name: "RIOT SHOTGUN", dmg: 10, rof: 2.7, mag: 6, reload: 1.35, pellets: 6, spread: 0.3, speed: 720, pierce: 0, kick: 6 },
-  { name: "AK-74 RIFLE", dmg: 17, rof: 7.6, mag: 30, reload: 1.2, pellets: 1, spread: 0.05, speed: 920, pierce: 1, kick: 2.4 },
-  { name: "M134 MINIGUN", dmg: 11, rof: 16.5, mag: 140, reload: 2.0, pellets: 1, spread: 0.14, speed: 880, pierce: 1, kick: 1.2 },
+  { name: "M9 SIDEARM", dmg: 13, rof: 4.4, mag: 12, reload: 0.85, pellets: 1, spread: 0.05, speed: 820, pierce: 0, kick: 2.2 },
+  { name: "VECTOR SMG", dmg: 9, rof: 11.5, mag: 34, reload: 1.05, pellets: 1, spread: 0.1, speed: 860, pierce: 0, kick: 1.5 },
+  { name: "RIOT SHOTGUN", dmg: 10, rof: 2.7, mag: 6, reload: 1.35, pellets: 6, spread: 0.3, speed: 740, pierce: 0, kick: 6 },
+  { name: "AK-74 RIFLE", dmg: 17, rof: 7.6, mag: 30, reload: 1.2, pellets: 1, spread: 0.05, speed: 940, pierce: 1, kick: 2.4 },
+  { name: "M134 MINIGUN", dmg: 11, rof: 16.5, mag: 140, reload: 2.0, pellets: 1, spread: 0.14, speed: 900, pierce: 1, kick: 1.2 },
 ];
 const TIER_AT = [0, 12, 35, 75, 140]; // kills needed for tier index
 
 const COMBO_WINDOW = 2.2;
+
+const WORLD_W = 3400;
+const WORLD_H = 2300;
+const ROAD_Y = 1000; // horizontal road centerline
+const ROAD_HALF = 80;
+const ROAD_X = 2150; // vertical road centerline
+const VROAD_HALF = 66;
+const CX = WORLD_W / 2;
+const CY = WORLD_H / 2;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -119,9 +160,7 @@ const dist2 = (ax: number, ay: number, bx: number, by: number) => {
 export class Engine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private ground: HTMLCanvasElement;
-  private gore: HTMLCanvasElement;
-  private goreCtx: CanvasRenderingContext2D;
+  private tile: CanvasPattern | null = null;
   private raf = 0;
   private lastT = 0;
   private w = 800;
@@ -131,6 +170,15 @@ export class Engine {
 
   private phase: "menu" | "playing" | "paused" | "gameover" = "menu";
 
+  // camera
+  private cam = { x: CX, y: CY };
+
+  // world
+  private obstacles: Obs[] = [];
+  private lamps: { x: number; y: number }[] = [];
+  private decals: Decal[] = [];
+  private goreDecals: GoreDecal[] = [];
+
   // input
   private keys = new Set<string>();
   private mouseX = 400;
@@ -138,15 +186,23 @@ export class Engine {
   private mouseDown = false;
   private touchVec = { x: 0, y: 0, active: false };
   private touchFiring = false;
+  private touchSprint = false;
 
   // player
-  private px = 400;
-  private py = 300;
+  private px = CX;
+  private py = CY;
   private pvx = 0;
   private pvy = 0;
   private hp = 100;
   private readonly maxHp = 100;
   private aim = 0;
+  private moveA = 0;
+  private moving = false;
+  private sprinting = false;
+  private stamina = 100;
+  private canSprint = true;
+  private runPhase = 0;
+  private stepT = 0;
   private invulnT = 0;
   private dashT = 0;
   private dashCd = 0;
@@ -176,7 +232,6 @@ export class Engine {
   private powerT = 0;
   private shieldT = 0;
   private heartT = 0;
-  private goreFadeT = 0;
 
   // wave
   private wave = 0;
@@ -208,10 +263,9 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
-    this.ground = document.createElement("canvas");
-    this.gore = document.createElement("canvas");
-    this.goreCtx = this.gore.getContext("2d")!;
     sfx.muted = loadMuted();
+    this.buildTile();
+    this.buildWorld();
     this.resize();
     this.seedAmbient();
     this.attach();
@@ -232,6 +286,149 @@ export class Engine {
       this.render();
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  /* ------------------------------ world building ------------------------------ */
+
+  private buildTile() {
+    const t = document.createElement("canvas");
+    t.width = 256;
+    t.height = 256;
+    const g = t.getContext("2d")!;
+    g.fillStyle = "#141a13";
+    g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 520; i++) {
+      g.fillStyle = Math.random() < 0.5 ? "rgba(0,0,0,0.16)" : "rgba(150,170,120,0.05)";
+      const s = rand(1, 2.4);
+      g.fillRect(rand(0, 256), rand(0, 256), s, s);
+    }
+    g.strokeStyle = "rgba(0,0,0,0.22)";
+    for (let i = 0; i < 4; i++) {
+      g.lineWidth = rand(0.5, 1.2);
+      g.beginPath();
+      let x = rand(0, 256);
+      let y = rand(0, 256);
+      g.moveTo(x, y);
+      for (let s = 0; s < 4; s++) {
+        x += rand(-46, 46);
+        y += rand(-46, 46);
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    for (let i = 0; i < 5; i++) {
+      const x = rand(0, 256);
+      const y = rand(0, 256);
+      const r = rand(14, 44);
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, "rgba(0,0,0,0.14)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    this.tile = this.ctx.createPattern(t, "repeat");
+  }
+
+  private obsFits(x: number, y: number, w: number, h: number): boolean {
+    const m = 90;
+    if (x < m || y < m || x + w > WORLD_W - m || y + h > WORLD_H - m) return false;
+    // keep roads clear
+    if (y < ROAD_Y + ROAD_HALF + 34 && y + h > ROAD_Y - ROAD_HALF - 34) return false;
+    if (x < ROAD_X + VROAD_HALF + 34 && x + w > ROAD_X - VROAD_HALF - 34) return false;
+    // keep the central drop-zone plaza clear
+    const nx = clamp(CX, x, x + w);
+    const ny = clamp(CY, y, y + h);
+    if (dist2(nx, ny, CX, CY) < 380 * 380) return false;
+    // no overlap with existing
+    for (const o of this.obstacles) {
+      if (x < o.x + o.w + 46 && x + w + 46 > o.x && y < o.y + o.h + 46 && y + h + 46 > o.y) return false;
+    }
+    return true;
+  }
+
+  private placeObs(kind: ObsKind, w: number, h: number, col: string, col2: string, low: boolean, fire = false) {
+    for (let i = 0; i < 80; i++) {
+      const x = rand(0, WORLD_W - w);
+      const y = rand(0, WORLD_H - h);
+      if (this.obsFits(x, y, w, h)) {
+        this.obstacles.push({ kind, x, y, w, h, low, col, col2, fire, fireT: rand(0, 0.2), seed: Math.floor(rand(0, 9999)) });
+        return;
+      }
+    }
+  }
+
+  private buildWorld() {
+    this.obstacles = [];
+    this.lamps = [];
+    this.decals = [];
+    this.goreDecals = [];
+
+    const bCols: [string, string][] = [
+      ["#232a31", "#1a2026"],
+      ["#20262b", "#171c20"],
+      ["#262d2a", "#1b211e"],
+      ["#2a2620", "#1e1b16"],
+    ];
+    for (let i = 0; i < 7; i++) {
+      const c = bCols[i % bCols.length];
+      this.placeObs("building", rand(260, 430), rand(190, 310), c[0], c[1], false);
+    }
+    const cCols: [string, string][] = [
+      ["#6e3a24", "#54291a"],
+      ["#49522f", "#373e22"],
+      ["#31404d", "#232e38"],
+      ["#5c4a26", "#453819"],
+    ];
+    for (let i = 0; i < 5; i++) {
+      const c = cCols[i % cCols.length];
+      if (Math.random() < 0.5) this.placeObs("container", 176, 66, c[0], c[1], false);
+      else this.placeObs("container", 66, 176, c[0], c[1], false);
+    }
+    const carCols: [string, string][] = [
+      ["#5a3a3a", "#3d2626"],
+      ["#3f4a55", "#2a323b"],
+      ["#4d4a35", "#353323"],
+      ["#555b60", "#3a3e42"],
+    ];
+    for (let i = 0; i < 6; i++) {
+      const c = carCols[i % carCols.length];
+      const vert = Math.random() < 0.4;
+      this.placeObs("car", vert ? 40 : 84, vert ? 84 : 40, c[0], c[1], false, i < 2);
+    }
+    for (let i = 0; i < 5; i++) {
+      if (Math.random() < 0.5) this.placeObs("barrier", 150, 20, "#3a3d40", "#2b2e31", false);
+      else this.placeObs("barrier", 20, 150, "#3a3d40", "#2b2e31", false);
+    }
+    for (let i = 0; i < 4; i++) this.placeObs("sandbag", 132, 28, "#4d4632", "#3a3524", true);
+    for (let i = 0; i < 5; i++) this.placeObs("crate", 42, 42, "#3f4626", "#2e341b", true);
+
+    // street lamps along both roads
+    for (let x = 260; x < WORLD_W - 200; x += rand(380, 520)) {
+      this.lamps.push({ x, y: ROAD_Y - ROAD_HALF - 26 });
+      if (Math.random() < 0.7) this.lamps.push({ x: x + rand(120, 260), y: ROAD_Y + ROAD_HALF + 26 });
+    }
+    for (let y = 300; y < WORLD_H - 200; y += rand(400, 560)) {
+      this.lamps.push({ x: ROAD_X - VROAD_HALF - 26, y });
+    }
+
+    // ground decals
+    for (let i = 0; i < 80; i++) this.decals.push({ k: "grass", x: rand(40, WORLD_W - 40), y: rand(40, WORLD_H - 40), r: rand(22, 74) });
+    for (let i = 0; i < 16; i++) this.decals.push({ k: "crater", x: rand(60, WORLD_W - 60), y: rand(60, WORLD_H - 60), r: rand(24, 58) });
+    for (let i = 0; i < 30; i++) {
+      const pts: number[] = [];
+      let x = 0;
+      let y = 0;
+      const segs = 4 + Math.floor(rand(0, 4));
+      for (let s = 0; s < segs; s++) {
+        x += rand(-80, 80);
+        y += rand(-80, 80);
+        pts.push(x, y);
+      }
+      this.decals.push({ k: "crack", x: rand(80, WORLD_W - 80), y: rand(80, WORLD_H - 80), r: 110, pts });
+    }
+    for (let i = 0; i < 24; i++) this.decals.push({ k: "rubble", x: rand(50, WORLD_W - 50), y: rand(50, WORLD_H - 50), r: rand(10, 22) });
+    for (let i = 0; i < 12; i++) this.decals.push({ k: "oil", x: rand(60, WORLD_W - 60), y: rand(60, WORLD_H - 60), r: rand(18, 40) });
+    for (let i = 0; i < 26; i++) this.decals.push({ k: "bone", x: rand(40, WORLD_W - 40), y: rand(40, WORLD_H - 40), r: rand(4, 9) });
   }
 
   /* ------------------------------ lifecycle ------------------------------ */
@@ -259,7 +456,7 @@ export class Engine {
     if (this.phase !== "playing") return;
     this.keys.add(c);
     if (c === "KeyR") this.startReload();
-    if (c === "Space" || c === "ShiftLeft" || c === "ShiftRight") this.dash();
+    if (c === "Space") this.dash();
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -321,13 +518,6 @@ export class Engine {
     this.canvas.height = Math.floor(this.h * this.dpr);
     this.canvas.style.width = `${this.w}px`;
     this.canvas.style.height = `${this.h}px`;
-    this.ground.width = this.canvas.width;
-    this.ground.height = this.canvas.height;
-    this.gore.width = this.canvas.width;
-    this.gore.height = this.canvas.height;
-    this.paintGround();
-    this.px = clamp(this.px, 30, this.w - 30);
-    this.py = clamp(this.py, 30, this.h - 30);
     this.seedSpores();
     this.seedFog();
   }
@@ -347,6 +537,8 @@ export class Engine {
   pause() {
     if (this.phase !== "playing") return;
     this.phase = "paused";
+    this.keys.clear();
+    this.mouseDown = false;
     sfx.ui();
     this.syncHud(true);
   }
@@ -370,7 +562,6 @@ export class Engine {
     this.texts = [];
     this.boss = null;
     this.dead = false;
-    this.goreCtx.clearRect(0, 0, this.gore.width, this.gore.height);
     this.seedAmbient();
     this.syncHud(true);
   }
@@ -398,6 +589,10 @@ export class Engine {
     this.touchFiring = on;
   }
 
+  setTouchSprint(on: boolean) {
+    this.touchSprint = on;
+  }
+
   get isTouch(): boolean {
     return typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }
@@ -413,11 +608,17 @@ export class Engine {
     this.texts = [];
     this.ambient = [];
     this.boss = null;
-    this.px = this.w / 2;
-    this.py = this.h / 2;
+    this.goreDecals = [];
+    this.px = CX;
+    this.py = CY;
+    this.cam.x = CX;
+    this.cam.y = CY;
     this.pvx = 0;
     this.pvy = 0;
     this.hp = this.maxHp;
+    this.stamina = 100;
+    this.canSprint = true;
+    this.sprinting = false;
     this.dead = false;
     this.invulnT = 0;
     this.dashT = 0;
@@ -442,15 +643,13 @@ export class Engine {
     this.intermission = -1;
     this.hurtT = 0;
     this.shakeT = 0;
-    this.goreCtx.clearRect(0, 0, this.gore.width, this.gore.height);
   }
 
   private seedAmbient() {
     this.ambient = [];
-    const n = 8;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < 12; i++) {
       this.ambient.push(
-        this.makeZombie(Math.random() < 0.3 ? "runner" : "walker", rand(60, this.w - 60), rand(60, this.h - 60), 1)
+        this.makeZombie(Math.random() < 0.3 ? "runner" : "walker", rand(200, WORLD_W - 200), rand(200, WORLD_H - 200), 1)
       );
     }
   }
@@ -474,95 +673,6 @@ export class Engine {
         ph: rand(0, 6.28),
       });
     }
-  }
-
-  private paintGround() {
-    const g = this.ground.getContext("2d")!;
-    const W = this.ground.width;
-    const H = this.ground.height;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = "#0e140d";
-    g.fillRect(0, 0, W, H);
-    // mottled patches
-    for (let i = 0; i < 42; i++) {
-      const x = rand(0, W);
-      const y = rand(0, H);
-      const r = rand(40, 220) * this.dpr;
-      const dark = Math.random() < 0.6;
-      const gr = g.createRadialGradient(x, y, 0, x, y, r);
-      if (dark) {
-        gr.addColorStop(0, "rgba(0,0,0,0.20)");
-        gr.addColorStop(1, "rgba(0,0,0,0)");
-      } else {
-        gr.addColorStop(0, "rgba(96,124,66,0.07)");
-        gr.addColorStop(1, "rgba(96,124,66,0)");
-      }
-      g.fillStyle = gr;
-      g.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-    // cracks
-    g.strokeStyle = "rgba(0,0,0,0.35)";
-    for (let i = 0; i < 26; i++) {
-      g.lineWidth = rand(0.6, 1.6) * this.dpr;
-      g.beginPath();
-      let x = rand(0, W);
-      let y = rand(0, H);
-      g.moveTo(x, y);
-      const segs = 4 + Math.floor(rand(0, 5));
-      for (let s = 0; s < segs; s++) {
-        x += rand(-70, 70) * this.dpr;
-        y += rand(-70, 70) * this.dpr;
-        g.lineTo(x, y);
-      }
-      g.stroke();
-    }
-    // speckles / bones
-    for (let i = 0; i < 320; i++) {
-      g.fillStyle = Math.random() < 0.85 ? "rgba(0,0,0,0.22)" : "rgba(214,206,178,0.10)";
-      const s = rand(1, 2.6) * this.dpr;
-      g.fillRect(rand(0, W), rand(0, H), s, s);
-    }
-    // containment ring + stencil markings
-    const cx = W / 2;
-    const cy = H / 2;
-    g.strokeStyle = "rgba(163,245,46,0.07)";
-    g.lineWidth = 3 * this.dpr;
-    g.setLineDash([26 * this.dpr, 18 * this.dpr]);
-    g.beginPath();
-    g.arc(cx, cy, Math.min(W, H) * 0.33, 0, Math.PI * 2);
-    g.stroke();
-    g.setLineDash([]);
-    g.font = `700 ${26 * this.dpr}px Oxanium, monospace`;
-    g.fillStyle = "rgba(163,245,46,0.06)";
-    g.textAlign = "center";
-    g.fillText("SECTOR 9 // CONTAINMENT FIELD", cx, cy - Math.min(W, H) * 0.33 - 16 * this.dpr);
-    g.fillStyle = "rgba(229,34,46,0.05)";
-    g.font = `700 ${18 * this.dpr}px Oxanium, monospace`;
-    g.fillText("NO EXIT — AUTHORIZED PERSONNEL ONLY", cx, cy + Math.min(W, H) * 0.33 + 30 * this.dpr);
-    // hazard corner stripes
-    g.save();
-    g.globalAlpha = 0.05;
-    for (const [ox, oy, rot] of [
-      [0, 0, 0],
-      [W, 0, Math.PI / 2],
-      [W, H, Math.PI],
-      [0, H, -Math.PI / 2],
-    ] as const) {
-      g.save();
-      g.translate(ox, oy);
-      g.rotate(rot);
-      for (let i = 0; i < 7; i++) {
-        g.fillStyle = i % 2 === 0 ? "#e8b62a" : "#10160f";
-        g.beginPath();
-        g.moveTo(i * 26 * this.dpr, 0);
-        g.lineTo(i * 26 * this.dpr + 26 * this.dpr, 0);
-        g.lineTo(i * 26 * this.dpr + 10 * this.dpr, 60 * this.dpr);
-        g.lineTo(i * 26 * this.dpr - 16 * this.dpr, 60 * this.dpr);
-        g.fill();
-      }
-      g.restore();
-    }
-    g.restore();
   }
 
   /* --------------------------------- waves --------------------------------- */
@@ -618,7 +728,8 @@ export class Engine {
       atkT: 0,
       lungeT: 0,
       spitT: rand(1, 2.4),
-      waypoint: null,
+      waypoint: null as { x: number; y: number } | null,
+      waypointT: 0,
       dead: false,
     };
     const hs = this.hpScale() * hpMul;
@@ -637,32 +748,26 @@ export class Engine {
     }
   }
 
+  private spawnEdgePos(margin: number): { x: number; y: number } {
+    const a = rand(0, Math.PI * 2);
+    const R = Math.hypot(this.w, this.h) / 2 + margin;
+    const x = clamp(this.cam.x + Math.cos(a) * R, 40, WORLD_W - 40);
+    const y = clamp(this.cam.y + Math.sin(a) * R * 0.85, 40, WORLD_H - 40);
+    return { x, y };
+  }
+
   private spawnZombie() {
-    const side = Math.floor(rand(0, 4));
-    const m = 46;
-    let x = 0;
-    let y = 0;
-    if (side === 0) {
-      x = rand(-m, this.w + m);
-      y = -m;
-    } else if (side === 1) {
-      x = this.w + m;
-      y = rand(-m, this.h + m);
-    } else if (side === 2) {
-      x = rand(-m, this.w + m);
-      y = this.h + m;
-    } else {
-      x = -m;
-      y = rand(-m, this.h + m);
-    }
-    const z = this.makeZombie(this.pickKind(), x, y, 1);
+    const p = this.spawnEdgePos(70);
+    const z = this.makeZombie(this.pickKind(), p.x, p.y, 1);
+    const res = this.collideObs(z.x, z.y, z.r);
+    z.x = res.x;
+    z.y = res.y;
     this.zombies.push(z);
-    // spawn poof
     for (let i = 0; i < 5; i++) {
       this.particles.push({
         kind: "smoke",
-        x: clamp(x, 10, this.w - 10),
-        y: clamp(y, 10, this.h - 10),
+        x: z.x,
+        y: z.y,
         vx: rand(-30, 30),
         vy: rand(-40, -10),
         t: 0,
@@ -676,9 +781,71 @@ export class Engine {
   }
 
   private spawnBoss() {
-    const b = this.makeZombie("boss", this.w / 2, -60, 1);
+    const p = this.spawnEdgePos(140);
+    const b = this.makeZombie("boss", p.x, p.y, 1);
     this.zombies.push(b);
     this.boss = b;
+    this.addShake(10, 0.5);
+  }
+
+  /* ------------------------------ collision ------------------------------ */
+
+  private collideObs(x: number, y: number, r: number): { x: number; y: number; hit: Obs | null } {
+    let hit: Obs | null = null;
+    for (const o of this.obstacles) {
+      const nx = clamp(x, o.x, o.x + o.w);
+      const ny = clamp(y, o.y, o.y + o.h);
+      const dx = x - nx;
+      const dy = y - ny;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < r * r) {
+        hit = o;
+        if (d2 > 0.0001) {
+          const d = Math.sqrt(d2);
+          x = nx + (dx / d) * r;
+          y = ny + (dy / d) * r;
+        } else {
+          const l = x - o.x;
+          const rt = o.x + o.w - x;
+          const tp = y - o.y;
+          const bt = o.y + o.h - y;
+          const m = Math.min(l, rt, tp, bt);
+          if (m === l) x = o.x - r;
+          else if (m === rt) x = o.x + o.w + r;
+          else if (m === tp) y = o.y - r;
+          else y = o.y + o.h + r;
+        }
+      }
+    }
+    return { x, y, hit };
+  }
+
+  private segHitsObs(x1: number, y1: number, x2: number, y2: number, o: Obs): boolean {
+    let tmin = 0;
+    let tmax = 1;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (Math.abs(dx) < 1e-9) {
+      if (x1 < o.x || x1 > o.x + o.w) return false;
+    } else {
+      let t1 = (o.x - x1) / dx;
+      let t2 = (o.x + o.w - x1) / dx;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+    if (Math.abs(dy) < 1e-9) {
+      if (y1 < o.y || y1 > o.y + o.h) return false;
+    } else {
+      let t1 = (o.y - y1) / dy;
+      let t2 = (o.y + o.h - y1) / dy;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+    return true;
   }
 
   /* -------------------------------- update -------------------------------- */
@@ -688,11 +855,14 @@ export class Engine {
       this.updateAmbient(dt);
       this.updateParticles(dt);
       this.updateAtmos(dt);
+      this.updateCamera(dt);
+      this.updateFires(dt);
       return;
     }
     if (this.phase !== "playing" && this.phase !== "gameover") return;
 
     this.updateAtmos(dt);
+    this.updateFires(dt);
 
     if (this.phase === "gameover") {
       this.updateZombies(dt, true);
@@ -722,6 +892,7 @@ export class Engine {
     }
 
     this.updatePlayer(dt);
+    this.updateCamera(dt);
     this.updateFiring(dt);
     this.updateBullets(dt);
     this.updateWave(dt);
@@ -730,17 +901,6 @@ export class Engine {
     this.updatePickups(dt);
     this.updateParticles(dt);
     this.updateTexts(dt);
-
-    // gore fade
-    this.goreFadeT -= dt;
-    if (this.goreFadeT <= 0) {
-      this.goreFadeT = 1.6;
-      this.goreCtx.save();
-      this.goreCtx.globalCompositeOperation = "destination-out";
-      this.goreCtx.fillStyle = "rgba(0,0,0,0.028)";
-      this.goreCtx.fillRect(0, 0, this.gore.width, this.gore.height);
-      this.goreCtx.restore();
-    }
 
     this.hudT -= dt;
     if (this.hudT <= 0) {
@@ -769,10 +929,50 @@ export class Engine {
     this.shakeT = Math.max(0, this.shakeT - dt);
   }
 
+  private updateFires(dt: number) {
+    for (const o of this.obstacles) {
+      if (!o.fire) continue;
+      o.fireT -= dt;
+      if (o.fireT <= 0) {
+        o.fireT = rand(0.09, 0.16);
+        const cx = o.x + o.w / 2;
+        const cy = o.y + o.h / 2;
+        this.particles.push({
+          kind: "smoke",
+          x: cx + rand(-14, 14),
+          y: cy + rand(-8, 8),
+          vx: rand(-12, 12),
+          vy: rand(-70, -38),
+          t: 0,
+          life: rand(0.7, 1.3),
+          size: rand(7, 13),
+          color: "rgba(60,60,58,0.3)",
+          rot: 0,
+          vr: 0,
+        });
+        if (Math.random() < 0.5) {
+          this.particles.push({
+            kind: "spark",
+            x: cx + rand(-10, 10),
+            y: cy + rand(-6, 6),
+            vx: rand(-40, 40),
+            vy: rand(-140, -60),
+            t: 0,
+            life: rand(0.2, 0.45),
+            size: 1.6,
+            color: "#ffb347",
+            rot: 0,
+            vr: 0,
+          });
+        }
+      }
+    }
+  }
+
   private updateAmbient(dt: number) {
     for (const z of this.ambient) {
       if (!z.waypoint || dist2(z.x, z.y, z.waypoint.x, z.waypoint.y) < 900) {
-        z.waypoint = { x: rand(50, this.w - 50), y: rand(50, this.h - 50) };
+        z.waypoint = { x: rand(120, WORLD_W - 120), y: rand(120, WORLD_H - 120) };
       }
       const a = Math.atan2(z.waypoint.y - z.y, z.waypoint.x - z.x);
       z.x += Math.cos(a) * z.speed * 0.4 * dt;
@@ -803,7 +1003,23 @@ export class Engine {
   private updatePlayer(dt: number) {
     if (this.dead) return;
     const mv = this.moveInput();
-    const spd = 268;
+    this.moving = mv.x !== 0 || mv.y !== 0;
+    if (this.moving) this.moveA = Math.atan2(mv.y, mv.x);
+
+    // sprint + stamina
+    const wantSprint = (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") || this.touchSprint) && this.moving && this.dashT <= 0;
+    if (wantSprint && this.canSprint && this.stamina > 0) {
+      this.sprinting = true;
+      this.stamina = Math.max(0, this.stamina - 30 * dt);
+      if (this.stamina <= 0) this.canSprint = false;
+    } else {
+      this.sprinting = false;
+      this.stamina = Math.min(100, this.stamina + 24 * dt);
+      if (!this.canSprint && this.stamina >= 26) this.canSprint = true;
+    }
+
+    const spd = this.sprinting ? 400 : 262;
+    const accel = 1 - Math.exp(-14 * dt);
 
     if (this.dashT > 0) {
       this.dashT -= dt;
@@ -811,19 +1027,51 @@ export class Engine {
       this.pvy = this.dashDy * 940;
       this.ghosts.push({ x: this.px, y: this.py, a: 0.5, aim: this.aim });
     } else {
-      this.pvx = mv.x * spd;
-      this.pvy = mv.y * spd;
+      this.pvx += (mv.x * spd - this.pvx) * accel;
+      this.pvy += (mv.y * spd - this.pvy) * accel;
     }
-    this.px = clamp(this.px + this.pvx * dt, 22, this.w - 22);
-    this.py = clamp(this.py + this.pvy * dt, 22, this.h - 22);
+    this.px += this.pvx * dt;
+    this.py += this.pvy * dt;
+
+    const res = this.collideObs(this.px, this.py, 13);
+    this.px = res.x;
+    this.py = res.y;
+    this.px = clamp(this.px, 26, WORLD_W - 26);
+    this.py = clamp(this.py, 26, WORLD_H - 26);
+
+    // footsteps + dust
+    const vel = Math.hypot(this.pvx, this.pvy);
+    if (vel > 40 && this.dashT <= 0) {
+      this.runPhase += vel * dt * 0.085;
+      this.stepT -= dt;
+      if (this.stepT <= 0) {
+        this.stepT = this.sprinting ? 0.23 : 0.34;
+        sfx.step(this.sprinting);
+        if (this.sprinting || Math.random() < 0.4) {
+          this.particles.push({
+            kind: "dust",
+            x: this.px - Math.cos(this.moveA) * 10 + rand(-4, 4),
+            y: this.py - Math.sin(this.moveA) * 10 + rand(-4, 4),
+            vx: -Math.cos(this.moveA) * rand(10, 40) + rand(-14, 14),
+            vy: -Math.sin(this.moveA) * rand(10, 40) + rand(-14, 14),
+            t: 0,
+            life: rand(0.3, 0.55),
+            size: rand(2.4, 4.6),
+            color: "rgba(150,145,115,0.16)",
+            rot: 0,
+            vr: 0,
+          });
+        }
+      }
+    }
 
     for (const g of this.ghosts) g.a -= dt * 2.4;
     this.ghosts = this.ghosts.filter((g) => g.a > 0);
 
-    // aim
+    // aim (mouse is screen-space → convert to world)
     if (this.touchFiring) {
       let best: Zombie | null = null;
-      let bd = 720 * 720;
+      let bd = 760 * 760;
       for (const z of this.zombies) {
         const d = dist2(z.x, z.y, this.px, this.py);
         if (d < bd) {
@@ -833,8 +1081,32 @@ export class Engine {
       }
       if (best) this.aim = Math.atan2(best.y - this.py, best.x - this.px);
     } else {
-      this.aim = Math.atan2(this.mouseY - this.py, this.mouseX - this.px);
+      const wx = this.cam.x - this.w / 2 + this.mouseX;
+      const wy = this.cam.y - this.h / 2 + this.mouseY;
+      this.aim = Math.atan2(wy - this.py, wx - this.px);
     }
+  }
+
+  private updateCamera(dt: number) {
+    if (this.phase === "menu") {
+      // slow cinematic drift over the sector
+      const tx = CX + Math.cos(this.time * 0.07) * 460;
+      const ty = CY + Math.sin(this.time * 0.052) * 330;
+      const k = 1 - Math.exp(-1.4 * dt);
+      this.cam.x += (tx - this.cam.x) * k;
+      this.cam.y += (ty - this.cam.y) * k;
+    } else if (this.phase === "playing") {
+      const look = this.isTouch ? 0 : 86;
+      const tx = this.px + Math.cos(this.aim) * look;
+      const ty = this.py + Math.sin(this.aim) * look;
+      const k = 1 - Math.exp(-6.5 * dt);
+      this.cam.x += (tx - this.cam.x) * k;
+      this.cam.y += (ty - this.cam.y) * k;
+    }
+    if (WORLD_W <= this.w) this.cam.x = WORLD_W / 2;
+    else this.cam.x = clamp(this.cam.x, this.w / 2, WORLD_W - this.w / 2);
+    if (WORLD_H <= this.h) this.cam.y = WORLD_H / 2;
+    else this.cam.y = clamp(this.cam.y, this.h / 2, WORLD_H - this.h / 2);
   }
 
   private dash() {
@@ -903,7 +1175,7 @@ export class Engine {
     this.fireT = 1 / (w.rof * (this.frenzyT > 0 ? 1.7 : 1));
     this.ammo--;
     this.shots += w.pellets;
-    const spread = w.spread + this.spreadKick * 0.05;
+    const spread = w.spread + this.spreadKick * 0.05 + (this.sprinting ? 0.05 : 0) + (this.moving ? 0.02 : 0);
     const mx = this.px + Math.cos(this.aim) * 24;
     const my = this.py + Math.sin(this.aim) * 24;
     const dmgMul = this.powerT > 0 ? 1.75 : 1;
@@ -917,7 +1189,7 @@ export class Engine {
         vy: Math.sin(a) * spd,
         dmg: w.dmg * dmgMul * rand(0.9, 1.1),
         pierce: w.pierce,
-        life: 0.9,
+        life: 0.95,
         hitIds: new Set(),
       });
     }
@@ -949,10 +1221,38 @@ export class Engine {
 
   private updateBullets(dt: number) {
     for (const b of this.bullets) {
+      const ox = b.x;
+      const oy = b.y;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
-      if (b.x < -20 || b.x > this.w + 20 || b.y < -20 || b.y > this.h + 20) b.life = 0;
+      if (b.x < -40 || b.x > WORLD_W + 40 || b.y < -40 || b.y > WORLD_H + 40) b.life = 0;
+      // walls block bullets (low cover does not)
+      for (const o of this.obstacles) {
+        if (o.low) continue;
+        if (this.segHitsObs(ox, oy, b.x, b.y, o)) {
+          b.life = 0;
+          for (let i = 0; i < 4; i++) {
+            const a = Math.atan2(-b.vy, -b.vx) + rand(-0.8, 0.8);
+            this.particles.push({
+              kind: "spark",
+              x: b.x,
+              y: b.y,
+              vx: Math.cos(a) * rand(60, 200),
+              vy: Math.sin(a) * rand(60, 200),
+              t: 0,
+              life: rand(0.12, 0.28),
+              size: 1.6,
+              color: "#ffd9a0",
+              rot: 0,
+              vr: 0,
+            });
+          }
+          if (Math.random() < 0.25) sfx.zHit();
+          break;
+        }
+      }
+      if (b.life <= 0) continue;
       for (const z of this.zombies) {
         if (z.dead || b.hitIds.has(z)) continue;
         const rr = z.r + 4;
@@ -1012,6 +1312,7 @@ export class Engine {
       // wave cleared
       const heal = 14;
       this.hp = Math.min(this.maxHp, this.hp + heal);
+      this.stamina = 100;
       this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
       sfx.waveClear();
       this.intermission = 3.0;
@@ -1036,35 +1337,51 @@ export class Engine {
       z.flashT = Math.max(0, z.flashT - dt);
       z.atkT = Math.max(0, z.atkT - dt);
       z.lungeT = Math.max(0, z.lungeT - dt);
+      z.waypointT = Math.max(0, z.waypointT - dt);
       z.phase += dt * (z.kind === "runner" ? 11 : 5);
 
-      const tx = noPlayer ? this.px : this.px;
-      const ty = noPlayer ? this.py : this.py;
+      // steer toward waypoint (obstacle avoidance) or player
+      let tx = this.px;
+      let ty = this.py;
+      if (z.waypoint && z.waypointT > 0) {
+        tx = z.waypoint.x;
+        ty = z.waypoint.y;
+        if (dist2(z.x, z.y, tx, ty) < 42 * 42) {
+          z.waypoint = null;
+          tx = this.px;
+          ty = this.py;
+        }
+      } else if (z.waypoint) {
+        z.waypoint = null;
+      }
       const d = Math.hypot(tx - z.x, ty - z.y) || 1;
       const dirX = (tx - z.x) / d;
       const dirY = (ty - z.y) / d;
 
-      if (z.kind === "spitter" && !noPlayer) {
+      if (z.kind === "spitter" && !noPlayer && !z.waypoint) {
         z.spitT -= dt;
+        const pd = Math.hypot(this.px - z.x, this.py - z.y) || 1;
         const want = 250;
         let mx = 0;
         let my = 0;
-        if (d > want + 40) {
-          mx = dirX;
-          my = dirY;
-        } else if (d < want - 60) {
-          mx = -dirX;
-          my = -dirY;
+        const pdirX = (this.px - z.x) / pd;
+        const pdirY = (this.py - z.y) / pd;
+        if (pd > want + 40) {
+          mx = pdirX;
+          my = pdirY;
+        } else if (pd < want - 60) {
+          mx = -pdirX;
+          my = -pdirY;
         } else {
-          mx = -dirY;
-          my = dirX;
+          mx = -pdirY;
+          my = pdirX;
         }
         z.x += mx * z.speed * dt;
         z.y += my * z.speed * dt;
-        if (z.spitT <= 0 && d < 560 && !this.dead) {
+        if (z.spitT <= 0 && pd < 620 && !this.dead) {
           z.spitT = rand(1.9, 2.7);
           const a = Math.atan2(this.py - z.y, this.px - z.x) + rand(-0.12, 0.12);
-          this.acids.push({ x: z.x, y: z.y, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270, life: 2.4 });
+          this.acids.push({ x: z.x, y: z.y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, life: 2.6 });
           sfx.spit();
           z.lungeT = 0.2;
         }
@@ -1073,8 +1390,34 @@ export class Engine {
         z.y += dirY * z.speed * dt;
       }
 
-      z.x = clamp(z.x, -60, this.w + 60);
-      z.y = clamp(z.y, -60, this.h + 60);
+      // collide with the world
+      const res = this.collideObs(z.x, z.y, z.r);
+      if (res.hit && !z.waypoint) {
+        // route around the blocking obstacle via its best corner
+        const o = res.hit;
+        const corners = [
+          { x: o.x - z.r - 6, y: o.y - z.r - 6 },
+          { x: o.x + o.w + z.r + 6, y: o.y - z.r - 6 },
+          { x: o.x - z.r - 6, y: o.y + o.h + z.r + 6 },
+          { x: o.x + o.w + z.r + 6, y: o.y + o.h + z.r + 6 },
+        ];
+        let best = corners[0];
+        let bd = Infinity;
+        for (const cn of corners) {
+          const cost = dist2(z.x, z.y, cn.x, cn.y) + dist2(cn.x, cn.y, this.px, this.py);
+          if (cost < bd) {
+            bd = cost;
+            best = cn;
+          }
+        }
+        z.waypoint = best;
+        z.waypointT = 1.6;
+      }
+      z.x = res.x;
+      z.y = res.y;
+
+      z.x = clamp(z.x, -60, WORLD_W + 60);
+      z.y = clamp(z.y, -60, WORLD_H + 60);
 
       // attack player
       if (!noPlayer && !this.dead) {
@@ -1117,7 +1460,7 @@ export class Engine {
       a.x += a.vx * dt;
       a.y += a.vy * dt;
       a.life -= dt;
-      if (a.x < -20 || a.x > this.w + 20 || a.y < -20 || a.y > this.h + 20) {
+      if (a.x < -20 || a.x > WORLD_W + 20 || a.y < -20 || a.y > WORLD_H + 20) {
         a.life = 0;
         continue;
       }
@@ -1199,7 +1542,12 @@ export class Engine {
       else if (r < 0.215) kind = "shield";
       else return;
     }
-    this.pickups.push({ kind, x: clamp(x, 30, this.w - 30), y: clamp(y, 30, this.h - 30), t: rand(0, 3), life: 12 });
+    let px = clamp(x, 40, WORLD_W - 40);
+    let py = clamp(y, 40, WORLD_H - 40);
+    const res = this.collideObs(px, py, 16);
+    px = res.x;
+    py = res.y;
+    this.pickups.push({ kind, x: px, y: py, t: rand(0, 3), life: 16 });
   }
 
   /* ------------------------------ combat core ------------------------------ */
@@ -1245,20 +1593,18 @@ export class Engine {
   }
 
   private goreSplat(x: number, y: number, big: boolean) {
-    const g = this.goreCtx;
-    g.save();
-    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    const n = big ? 9 : 5;
+    const n = big ? 10 : 6;
     for (let i = 0; i < n; i++) {
       const a = rand(0, 6.28);
-      const d = rand(0, big ? 34 : 20);
-      const r = rand(3, big ? 14 : 9);
-      g.fillStyle = Math.random() < 0.5 ? "rgba(96,10,16,0.5)" : "rgba(140,16,24,0.42)";
-      g.beginPath();
-      g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, r, 0, Math.PI * 2);
-      g.fill();
+      const d = rand(0, big ? 36 : 20);
+      this.goreDecals.push({
+        x: x + Math.cos(a) * d,
+        y: y + Math.sin(a) * d,
+        r: rand(3, big ? 15 : 9),
+        c: Math.random() < 0.5 ? "rgba(96,10,16,0.5)" : "rgba(140,16,24,0.42)",
+      });
     }
-    g.restore();
+    if (this.goreDecals.length > 320) this.goreDecals.splice(0, this.goreDecals.length - 320);
   }
 
   private killZombie(z: Zombie, angle: number) {
@@ -1369,8 +1715,11 @@ export class Engine {
     // knockback
     const a = Math.atan2(this.py - sy, this.px - sx);
     const kb = heavy ? 130 : 60;
-    this.px = clamp(this.px + Math.cos(a) * kb * 0.3, 22, this.w - 22);
-    this.py = clamp(this.py + Math.sin(a) * kb * 0.3, 22, this.h - 22);
+    this.px = clamp(this.px + Math.cos(a) * kb * 0.3, 26, WORLD_W - 26);
+    this.py = clamp(this.py + Math.sin(a) * kb * 0.3, 26, WORLD_H - 26);
+    const res = this.collideObs(this.px, this.py, 13);
+    this.px = res.x;
+    this.py = res.y;
     this.blood(this.px, this.py, a, 6);
     if (this.hp <= 0) {
       this.hp = 0;
@@ -1437,7 +1786,7 @@ export class Engine {
         p.vx *= 1 - 6 * dt;
         p.vy *= 1 - 6 * dt;
       }
-      if (p.kind === "smoke") p.vy -= 20 * dt;
+      if (p.kind === "smoke" || p.kind === "dust") p.vy -= 20 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += p.vr * dt;
@@ -1485,6 +1834,8 @@ export class Engine {
       comboMult: 1 + Math.min(this.combo, 40) * 0.1,
       comboFrac: this.combo > 0 ? clamp(this.comboT / COMBO_WINDOW, 0, 1) : 0,
       dashFrac: 1 - clamp(this.dashCd / 1.5, 0, 1),
+      stamina: this.stamina,
+      sprinting: this.sprinting,
       buffs: { frenzy: this.frenzyT, power: this.powerT, shield: this.shieldT },
       boss: this.boss && !this.boss.dead ? { name: "THE ABOMINATION", frac: clamp(this.boss.hp / this.boss.maxHp, 0, 1) } : null,
       hurt: this.hurtT,
@@ -1495,6 +1846,15 @@ export class Engine {
   }
 
   /* --------------------------------- render --------------------------------- */
+
+  private vis(x: number, y: number, m: number): boolean {
+    return (
+      x > this.cam.x - this.w / 2 - m &&
+      x < this.cam.x + this.w / 2 + m &&
+      y > this.cam.y - this.h / 2 - m &&
+      y < this.cam.y + this.h / 2 + m
+    );
+  }
 
   private render() {
     const c = this.ctx;
@@ -1508,52 +1868,488 @@ export class Engine {
     } else {
       this.shakeMag = 0;
     }
+
     c.save();
-    c.translate(ox, oy);
-    c.drawImage(this.ground, 0, 0, this.w, this.h);
-    c.drawImage(this.gore, 0, 0, this.w, this.h);
+    c.translate(Math.round(this.w / 2 - this.cam.x + ox), Math.round(this.h / 2 - this.cam.y + oy));
+
+    const vx0 = this.cam.x - this.w / 2 - 60;
+    const vy0 = this.cam.y - this.h / 2 - 60;
+    const vx1 = this.cam.x + this.w / 2 + 60;
+    const vy1 = this.cam.y + this.h / 2 + 60;
+
+    this.drawGround(c, vx0, vy0, vx1, vy1);
+    this.drawObstacles(c);
 
     if (this.phase === "menu") {
-      for (const z of this.ambient) this.drawZombie(c, z);
+      for (const z of this.ambient) if (this.vis(z.x, z.y, 60)) this.drawZombie(c, z);
     } else {
       this.drawPickups(c);
+      for (const z of this.zombies) if (this.vis(z.x, z.y, 80)) this.drawZombie(c, z);
+      if (!this.dead) this.drawPlayer(c);
       this.drawBullets(c);
       this.drawAcids(c);
-      for (const z of this.zombies) this.drawZombie(c, z);
-      if (!this.dead) this.drawPlayer(c);
     }
 
     this.drawParticles(c);
-    this.drawDarkness(c);
-    this.drawFog(c);
-    this.drawSpores(c);
+    this.drawDarkness(c, vx0, vy0, vx1, vy1);
+    this.drawLights(c);
     this.drawTexts(c);
 
-    if (this.phase === "playing" && !this.isTouch) this.drawCrosshair(c);
     c.restore();
+
+    // screen-space atmosphere
+    this.drawFog(c);
+    this.drawSpores(c);
+    if (this.phase !== "menu") this.drawMinimap(c);
+    if (this.phase === "playing" && !this.isTouch) this.drawCrosshair(c);
   }
 
-  private drawDarkness(c: CanvasRenderingContext2D) {
-    const lx = this.phase === "menu" ? this.w / 2 : this.px;
-    const ly = this.phase === "menu" ? this.h / 2 : this.py;
+  private drawGround(c: CanvasRenderingContext2D, vx0: number, vy0: number, vx1: number, vy1: number) {
+    // void beyond the sector
+    c.fillStyle = "#05080a";
+    c.fillRect(vx0, vy0, vx1 - vx0, vy1 - vy0);
+
+    // sector floor
+    const gx0 = Math.max(0, vx0);
+    const gy0 = Math.max(0, vy0);
+    const gx1 = Math.min(WORLD_W, vx1);
+    const gy1 = Math.min(WORLD_H, vy1);
+    if (this.tile) {
+      c.fillStyle = this.tile;
+      c.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
+    }
+
+    // roads
+    const roadY0 = ROAD_Y - ROAD_HALF;
+    const roadY1 = ROAD_Y + ROAD_HALF;
+    const roadX0 = ROAD_X - VROAD_HALF;
+    const roadX1 = ROAD_X + VROAD_HALF;
+    c.fillStyle = "#0b0e0b";
+    if (vy1 > roadY0 && vy0 < roadY1) c.fillRect(gx0, roadY0, gx1 - gx0, roadY1 - roadY0);
+    if (vx1 > roadX0 && vx0 < roadX1) c.fillRect(roadX0, gy0, roadX1 - roadX0, gy1 - gy0);
+    c.strokeStyle = "rgba(232,224,200,0.07)";
+    c.lineWidth = 3;
+    if (vy1 > roadY0 && vy0 < roadY1) {
+      c.beginPath();
+      c.moveTo(gx0, roadY0);
+      c.lineTo(gx1, roadY0);
+      c.moveTo(gx0, roadY1);
+      c.lineTo(gx1, roadY1);
+      c.stroke();
+    }
+    if (vx1 > roadX0 && vx0 < roadX1) {
+      c.beginPath();
+      c.moveTo(roadX0, gy0);
+      c.lineTo(roadX0, gy1);
+      c.moveTo(roadX1, gy0);
+      c.lineTo(roadX1, gy1);
+      c.stroke();
+    }
+    // lane dashes
+    c.fillStyle = "rgba(210,220,160,0.09)";
+    const dx0 = Math.max(0, vx0);
+    const dx1 = Math.min(WORLD_W, vx1);
+    for (let x = Math.floor(dx0 / 90) * 90; x < dx1; x += 90) {
+      if (x > roadX0 - 60 && x < roadX1 + 20) continue;
+      c.fillRect(x, ROAD_Y - 2.5, 46, 5);
+    }
+    const dy0 = Math.max(0, vy0);
+    const dy1 = Math.min(WORLD_H, vy1);
+    for (let y = Math.floor(dy0 / 90) * 90; y < dy1; y += 90) {
+      if (y > roadY0 - 60 && y < roadY1 + 20) continue;
+      c.fillRect(ROAD_X - 2.5, y, 5, 46);
+    }
+
+    // decals
+    for (const d of this.decals) {
+      if (!this.vis(d.x, d.y, d.r + 60)) continue;
+      switch (d.k) {
+        case "grass": {
+          c.fillStyle = "rgba(29,41,23,0.55)";
+          c.beginPath();
+          c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          c.arc(d.x + d.r * 0.6, d.y + d.r * 0.3, d.r * 0.66, 0, Math.PI * 2);
+          c.arc(d.x - d.r * 0.5, d.y + d.r * 0.45, d.r * 0.55, 0, Math.PI * 2);
+          c.fill();
+          break;
+        }
+        case "crater": {
+          c.fillStyle = "rgba(6,9,6,0.75)";
+          c.beginPath();
+          c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          c.fill();
+          c.strokeStyle = "rgba(0,0,0,0.5)";
+          c.lineWidth = 3;
+          c.beginPath();
+          c.arc(d.x, d.y, d.r * 0.72, 0, Math.PI * 2);
+          c.stroke();
+          c.strokeStyle = "rgba(150,160,130,0.08)";
+          c.lineWidth = 2;
+          c.beginPath();
+          c.arc(d.x, d.y, d.r, -2.4, -0.6);
+          c.stroke();
+          break;
+        }
+        case "crack": {
+          c.strokeStyle = "rgba(0,0,0,0.35)";
+          c.lineWidth = 1.4;
+          c.beginPath();
+          c.moveTo(d.x, d.y);
+          const pts = d.pts ?? [];
+          for (let i = 0; i < pts.length; i += 2) c.lineTo(d.x + pts[i], d.y + pts[i + 1]);
+          c.stroke();
+          break;
+        }
+        case "rubble": {
+          c.fillStyle = "rgba(62,68,62,0.8)";
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2 + d.r;
+            c.beginPath();
+            c.arc(d.x + Math.cos(a) * d.r * 0.6, d.y + Math.sin(a) * d.r * 0.5, d.r * 0.42, 0, Math.PI * 2);
+            c.fill();
+          }
+          c.fillStyle = "rgba(40,44,40,0.9)";
+          c.beginPath();
+          c.arc(d.x, d.y, d.r * 0.4, 0, Math.PI * 2);
+          c.fill();
+          break;
+        }
+        case "oil": {
+          c.fillStyle = "rgba(4,7,9,0.5)";
+          c.beginPath();
+          c.ellipse(d.x, d.y, d.r * 1.7, d.r, 0.4, 0, Math.PI * 2);
+          c.fill();
+          break;
+        }
+        case "bone": {
+          c.fillStyle = "rgba(214,206,178,0.14)";
+          c.save();
+          c.translate(d.x, d.y);
+          c.rotate(d.r);
+          c.fillRect(-d.r, -1.4, d.r * 2, 2.8);
+          c.fillRect(-1.4, -d.r * 0.7, 2.8, d.r * 1.4);
+          c.restore();
+          break;
+        }
+      }
+    }
+
+    // persistent gore
+    for (const gd of this.goreDecals) {
+      if (!this.vis(gd.x, gd.y, gd.r + 20)) continue;
+      c.fillStyle = gd.c;
+      c.beginPath();
+      c.arc(gd.x, gd.y, gd.r, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    // drop-zone plaza markings
+    if (this.vis(CX, CY, 340)) {
+      c.strokeStyle = "rgba(163,245,46,0.09)";
+      c.lineWidth = 3;
+      c.setLineDash([26, 18]);
+      c.beginPath();
+      c.arc(CX, CY, 240, 0, Math.PI * 2);
+      c.stroke();
+      c.setLineDash([]);
+      c.font = "700 26px Oxanium, monospace";
+      c.textAlign = "center";
+      c.fillStyle = "rgba(163,245,46,0.09)";
+      c.fillText("SECTOR 9 // DROP ZONE", CX, CY - 258);
+      c.fillStyle = "rgba(229,34,46,0.08)";
+      c.font = "700 18px Oxanium, monospace";
+      c.fillText("NO EXIT — AUTHORIZED PERSONNEL ONLY", CX, CY + 282);
+    }
+
+    // perimeter fence
+    c.strokeStyle = "rgba(163,245,46,0.22)";
+    c.lineWidth = 4;
+    c.setLineDash([30, 20]);
+    c.strokeRect(0, 0, WORLD_W, WORLD_H);
+    c.setLineDash([]);
+    c.strokeStyle = "rgba(0,0,0,0.6)";
+    c.lineWidth = 8;
+    c.strokeRect(-6, -6, WORLD_W + 12, WORLD_H + 12);
+  }
+
+  private drawObstacles(c: CanvasRenderingContext2D) {
+    // shadows
+    for (const o of this.obstacles) {
+      if (!this.vis(o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h))) continue;
+      c.fillStyle = "rgba(0,0,0,0.35)";
+      c.fillRect(o.x + 7, o.y + 10, o.w, o.h);
+    }
+    for (const o of this.obstacles) {
+      if (!this.vis(o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h))) continue;
+      switch (o.kind) {
+        case "building": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.55)";
+          c.lineWidth = 3;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(255,255,255,0.05)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x + 10, o.y + 10, o.w - 20, o.h - 20);
+          // roof furniture
+          c.fillStyle = o.col2;
+          c.fillRect(o.x + 24, o.y + 22, 44, 34);
+          c.fillRect(o.x + o.w - 78, o.y + o.h - 62, 52, 40);
+          c.strokeStyle = "rgba(0,0,0,0.4)";
+          c.lineWidth = 1.5;
+          for (let i = 1; i < 4; i++) {
+            c.beginPath();
+            c.moveTo(o.x + 24, o.y + 22 + i * 8.5);
+            c.lineTo(o.x + 68, o.y + 22 + i * 8.5);
+            c.stroke();
+          }
+          if (o.seed % 3 === 0) {
+            c.strokeStyle = "rgba(163,245,46,0.12)";
+            c.lineWidth = 3;
+            c.beginPath();
+            c.arc(o.x + o.w / 2, o.y + o.h / 2, Math.min(o.w, o.h) * 0.2, 0, Math.PI * 2);
+            c.stroke();
+            c.fillStyle = "rgba(163,245,46,0.1)";
+            c.beginPath();
+            c.arc(o.x + o.w / 2, o.y + o.h / 2, 7, 0, Math.PI * 2);
+            c.fill();
+          }
+          break;
+        }
+        case "container": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.5)";
+          c.lineWidth = 2.5;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.25)";
+          c.lineWidth = 2;
+          if (o.w > o.h) {
+            for (let x = o.x + 14; x < o.x + o.w - 8; x += 15) {
+              c.beginPath();
+              c.moveTo(x, o.y + 3);
+              c.lineTo(x, o.y + o.h - 3);
+              c.stroke();
+            }
+          } else {
+            for (let y = o.y + 14; y < o.y + o.h - 8; y += 15) {
+              c.beginPath();
+              c.moveTo(o.x + 3, y);
+              c.lineTo(o.x + o.w - 3, y);
+              c.stroke();
+            }
+          }
+          c.fillStyle = o.col2;
+          c.fillRect(o.x, o.y, 8, o.h);
+          c.fillRect(o.x + o.w - 8, o.y, 8, o.h);
+          break;
+        }
+        case "car": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.55)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.fillStyle = o.col2;
+          if (o.w > o.h) {
+            c.fillRect(o.x + o.w * 0.24, o.y + 5, o.w * 0.42, o.h - 10);
+            c.fillStyle = "rgba(140,180,190,0.12)";
+            c.fillRect(o.x + o.w * 0.66, o.y + 5, o.w * 0.12, o.h - 10);
+          } else {
+            c.fillRect(o.x + 5, o.y + o.h * 0.24, o.w - 10, o.h * 0.42);
+            c.fillStyle = "rgba(140,180,190,0.12)";
+            c.fillRect(o.x + 5, o.y + o.h * 0.66, o.w - 10, o.h * 0.12);
+          }
+          if (o.fire) {
+            const fx = o.x + o.w / 2;
+            const fy = o.y + o.h / 2;
+            const fl = 0.7 + 0.3 * Math.sin(this.time * 23 + o.seed);
+            c.fillStyle = `rgba(255,120,30,${0.5 * fl})`;
+            c.beginPath();
+            c.moveTo(fx - 10, fy + 6);
+            c.lineTo(fx - 2, fy - 14 * fl);
+            c.lineTo(fx + 4, fy + 6);
+            c.closePath();
+            c.fill();
+            c.fillStyle = `rgba(255,220,110,${0.55 * fl})`;
+            c.beginPath();
+            c.moveTo(fx - 4, fy + 6);
+            c.lineTo(fx + 1, fy - 7 * fl);
+            c.lineTo(fx + 6, fy + 6);
+            c.closePath();
+            c.fill();
+          }
+          break;
+        }
+        case "barrier": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.5)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.save();
+          c.beginPath();
+          c.rect(o.x, o.y, o.w, o.h);
+          c.clip();
+          c.fillStyle = "rgba(201,162,39,0.4)";
+          const horiz = o.w > o.h;
+          for (let i = -1; i < (horiz ? o.w : o.h) / 18 + 1; i++) {
+            c.save();
+            if (horiz) {
+              c.translate(o.x + i * 18, o.y);
+              c.transform(1, 0, -0.6, 1, 0, 0);
+              c.fillRect(0, 0, 9, o.h);
+            } else {
+              c.translate(o.x, o.y + i * 18);
+              c.transform(1, 0, 0, 1, 0, 0);
+              c.fillRect(0, 0, o.w, 9);
+            }
+            c.restore();
+          }
+          c.restore();
+          break;
+        }
+        case "sandbag": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.45)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.fillStyle = o.col2;
+          const horiz = o.w > o.h;
+          if (horiz) {
+            for (let x = o.x + 4; x < o.x + o.w - 12; x += 22) {
+              c.beginPath();
+              c.ellipse(x + 9, o.y + o.h * 0.3, 10, 5, 0, 0, Math.PI * 2);
+              c.fill();
+              c.beginPath();
+              c.ellipse(x + 16, o.y + o.h * 0.72, 10, 5, 0, 0, Math.PI * 2);
+              c.fill();
+            }
+          } else {
+            for (let y = o.y + 4; y < o.y + o.h - 12; y += 22) {
+              c.beginPath();
+              c.ellipse(o.x + o.w * 0.3, y + 9, 5, 10, 0, 0, Math.PI * 2);
+              c.fill();
+              c.beginPath();
+              c.ellipse(o.x + o.w * 0.72, y + 16, 5, 10, 0, 0, Math.PI * 2);
+              c.fill();
+            }
+          }
+          break;
+        }
+        case "crate": {
+          c.fillStyle = o.col;
+          c.fillRect(o.x, o.y, o.w, o.h);
+          c.strokeStyle = "rgba(0,0,0,0.5)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x, o.y, o.w, o.h);
+          c.beginPath();
+          c.moveTo(o.x, o.y);
+          c.lineTo(o.x + o.w, o.y + o.h);
+          c.moveTo(o.x + o.w, o.y);
+          c.lineTo(o.x, o.y + o.h);
+          c.stroke();
+          c.fillStyle = "rgba(163,245,46,0.2)";
+          c.beginPath();
+          c.arc(o.x + o.w / 2, o.y + o.h / 2, 4, 0, Math.PI * 2);
+          c.fill();
+          break;
+        }
+      }
+    }
+    // lamp posts
+    for (const l of this.lamps) {
+      if (!this.vis(l.x, l.y, 40)) continue;
+      c.fillStyle = "#0a0d0a";
+      c.beginPath();
+      c.arc(l.x, l.y, 5, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#151a14";
+      c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(l.x, l.y);
+      c.lineTo(l.x, l.y + (l.y < ROAD_Y ? 14 : -14));
+      c.stroke();
+      c.fillStyle = "rgba(255,224,150,0.75)";
+      c.beginPath();
+      c.arc(l.x, l.y, 2.4, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  private drawDarkness(c: CanvasRenderingContext2D, vx0: number, vy0: number, vx1: number, vy1: number) {
+    const lx = this.phase === "menu" ? this.cam.x : this.px;
+    const ly = this.phase === "menu" ? this.cam.y : this.py;
     const flicker = 1 + Math.sin(this.time * 11) * 0.015 + Math.sin(this.time * 3.7) * 0.02;
-    const inner = 100 * flicker;
-    const outer = Math.max(this.w, this.h) * 0.72;
+    const inner = 120 * flicker;
+    const outer = 900;
     const gr = c.createRadialGradient(lx, ly, inner, lx, ly, outer);
     gr.addColorStop(0, "rgba(3,7,5,0)");
-    gr.addColorStop(0.4, "rgba(3,7,5,0.32)");
-    gr.addColorStop(1, "rgba(2,5,3,0.88)");
+    gr.addColorStop(0.45, "rgba(3,7,5,0.34)");
+    gr.addColorStop(1, "rgba(2,5,3,0.9)");
     c.fillStyle = gr;
-    c.fillRect(-20, -20, this.w + 40, this.h + 40);
+    c.fillRect(vx0, vy0, vx1 - vx0, vy1 - vy0);
+  }
+
+  private drawLights(c: CanvasRenderingContext2D) {
+    c.save();
+    c.globalCompositeOperation = "lighter";
+
+    // player flashlight cone toward aim
+    if (!this.dead && this.phase !== "menu") {
+      const flick = 0.92 + 0.08 * Math.sin(this.time * 13);
+      const cone = c.createRadialGradient(this.px, this.py, 20, this.px, this.py, 470);
+      cone.addColorStop(0, `rgba(214,255,170,${0.13 * flick})`);
+      cone.addColorStop(1, "rgba(214,255,170,0)");
+      c.fillStyle = cone;
+      c.beginPath();
+      c.moveTo(this.px, this.py);
+      c.arc(this.px, this.py, 470, this.aim - 0.44, this.aim + 0.44);
+      c.closePath();
+      c.fill();
+      const halo = c.createRadialGradient(this.px, this.py, 0, this.px, this.py, 240);
+      halo.addColorStop(0, "rgba(190,240,150,0.07)");
+      halo.addColorStop(1, "rgba(190,240,150,0)");
+      c.fillStyle = halo;
+      c.fillRect(this.px - 240, this.py - 240, 480, 480);
+    }
+
+    // street lamps
+    for (const l of this.lamps) {
+      if (!this.vis(l.x, l.y, 220)) continue;
+      const flick = 0.85 + 0.15 * Math.sin(this.time * 7 + l.x);
+      const g = c.createRadialGradient(l.x, l.y, 0, l.x, l.y, 200);
+      g.addColorStop(0, `rgba(255,214,140,${0.13 * flick})`);
+      g.addColorStop(1, "rgba(255,214,140,0)");
+      c.fillStyle = g;
+      c.fillRect(l.x - 200, l.y - 200, 400, 400);
+    }
+
+    // burning wrecks
+    for (const o of this.obstacles) {
+      if (!o.fire) continue;
+      const fx = o.x + o.w / 2;
+      const fy = o.y + o.h / 2;
+      if (!this.vis(fx, fy, 200)) continue;
+      const flick = 0.7 + 0.3 * Math.sin(this.time * 19 + o.seed);
+      const g = c.createRadialGradient(fx, fy, 0, fx, fy, 170);
+      g.addColorStop(0, `rgba(255,140,50,${0.16 * flick})`);
+      g.addColorStop(1, "rgba(255,140,50,0)");
+      c.fillStyle = g;
+      c.fillRect(fx - 170, fy - 170, 340, 340);
+    }
+
     // muzzle light
     if (this.muzzleT > 0) {
       const a = this.muzzleT / 0.05;
-      const mg = c.createRadialGradient(this.muzzleX, this.muzzleY, 0, this.muzzleX, this.muzzleY, 130);
+      const mg = c.createRadialGradient(this.muzzleX, this.muzzleY, 0, this.muzzleX, this.muzzleY, 150);
       mg.addColorStop(0, `rgba(255,210,120,${0.34 * a})`);
       mg.addColorStop(1, "rgba(255,210,120,0)");
       c.fillStyle = mg;
-      c.fillRect(this.muzzleX - 130, this.muzzleY - 130, 260, 260);
+      c.fillRect(this.muzzleX - 150, this.muzzleY - 150, 300, 300);
     }
+    c.restore();
   }
 
   private drawFog(c: CanvasRenderingContext2D) {
@@ -1621,7 +2417,6 @@ export class Engine {
     c.stroke();
 
     if (z.kind === "brute" || z.kind === "boss") {
-      // armor plates
       c.strokeStyle = "rgba(0,0,0,0.5)";
       c.lineWidth = 3;
       for (let i = 0; i < 3; i++) {
@@ -1652,7 +2447,7 @@ export class Engine {
       c.arc(-Math.cos(aimA) * r * 0.3, -Math.sin(aimA) * r * 0.3 + bob * 0.3, r * 0.2 * pulse, 0, Math.PI * 2);
       c.fill();
     }
-    // eyes (cheap glow: halo circle + core)
+    // eyes
     for (const s of [-1, 1]) {
       const ex = Math.cos(aimA) * r * 0.45 + Math.cos(perp) * r * 0.28 * s;
       const ey = Math.sin(aimA) * r * 0.45 + Math.sin(perp) * r * 0.28 * s + bob * 0.3;
@@ -1711,6 +2506,25 @@ export class Engine {
     c.beginPath();
     c.ellipse(0, 10, 14, 7, 0, 0, Math.PI * 2);
     c.fill();
+
+    // boots (visible when running)
+    if (this.moving || this.dashT > 0) {
+      const stride = Math.sin(this.runPhase) * 6;
+      const bperp = this.moveA + Math.PI / 2;
+      c.fillStyle = "#20261a";
+      for (const s of [-1, 1]) {
+        const off = stride * s;
+        c.beginPath();
+        c.arc(
+          Math.cos(this.moveA) * off + Math.cos(bperp) * 5 * s,
+          Math.sin(this.moveA) * off + Math.sin(bperp) * 5 * s + 3,
+          3.4,
+          0,
+          Math.PI * 2
+        );
+        c.fill();
+      }
+    }
 
     // gun
     c.save();
@@ -1840,9 +2654,9 @@ export class Engine {
 
   private drawPickups(c: CanvasRenderingContext2D) {
     for (const p of this.pickups) {
+      if (!this.vis(p.x, p.y, 120)) continue;
       const bobY = Math.sin(p.t * 3) * 4;
       const blink = p.life < 3 && Math.floor(p.t * 6) % 2 === 0;
-      if (blink) continue;
       const conf: Record<PickupKind, { col: string; glow: string }> = {
         medkit: { col: "#e5222e", glow: "rgba(229,34,46,0.35)" },
         frenzy: { col: "#ffd166", glow: "rgba(255,209,102,0.35)" },
@@ -1851,6 +2665,17 @@ export class Engine {
         nuke: { col: "#d4ff4d", glow: "rgba(212,255,77,0.45)" },
       };
       const cf = conf[p.kind];
+      // loot beacon
+      if (!blink) {
+        const beam = c.createLinearGradient(p.x, p.y - 110, p.x, p.y);
+        beam.addColorStop(0, "rgba(0,0,0,0)");
+        beam.addColorStop(1, cf.glow);
+        c.fillStyle = beam;
+        c.globalAlpha = 0.5;
+        c.fillRect(p.x - 4, p.y - 110, 8, 110);
+        c.globalAlpha = 1;
+      }
+      if (blink) continue;
       c.save();
       c.translate(p.x, p.y + bobY);
       const g = c.createRadialGradient(0, 0, 2, 0, 0, 26);
@@ -1893,7 +2718,6 @@ export class Engine {
         c.closePath();
         c.fill();
       } else {
-        // trefoil
         for (let i = 0; i < 3; i++) {
           const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
           c.beginPath();
@@ -1913,7 +2737,7 @@ export class Engine {
     for (const p of this.particles) {
       const f = 1 - p.t / p.life;
       if (p.kind === "ring") {
-        const r = 20 + (p.t / p.life) * Math.max(this.w, this.h) * 0.8;
+        const r = 20 + (p.t / p.life) * 1500;
         c.globalAlpha = f * 0.8;
         c.strokeStyle = p.color;
         c.lineWidth = 6 * f + 1;
@@ -1931,7 +2755,7 @@ export class Engine {
         c.fillStyle = p.color;
         c.fillRect(-2.5, -1, 5, 2);
         c.restore();
-      } else if (p.kind === "smoke") {
+      } else if (p.kind === "smoke" || p.kind === "dust") {
         c.fillStyle = p.color;
         c.beginPath();
         c.arc(p.x, p.y, p.size * (1 + p.t * 2), 0, Math.PI * 2);
@@ -1970,10 +2794,84 @@ export class Engine {
     c.globalAlpha = 1;
   }
 
+  private drawMinimap(c: CanvasRenderingContext2D) {
+    if (this.w < 680) return; // too narrow — would overlap the vitals panel
+    const mw = 178;
+    const mh = Math.round((mw * WORLD_H) / WORLD_W);
+    const x0 = this.w - mw - 14;
+    const y0 = 14;
+    const s = mw / WORLD_W;
+
+    c.fillStyle = "rgba(7,11,7,0.78)";
+    c.fillRect(x0, y0, mw, mh);
+    c.strokeStyle = "rgba(163,245,46,0.35)";
+    c.lineWidth = 1.5;
+    c.strokeRect(x0, y0, mw, mh);
+
+    // roads
+    c.strokeStyle = "rgba(232,224,200,0.18)";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(x0, y0 + ROAD_Y * s);
+    c.lineTo(x0 + mw, y0 + ROAD_Y * s);
+    c.moveTo(x0 + ROAD_X * s, y0);
+    c.lineTo(x0 + ROAD_X * s, y0 + mh);
+    c.stroke();
+
+    // obstacles
+    for (const o of this.obstacles) {
+      c.fillStyle = o.kind === "building" ? "rgba(140,160,140,0.4)" : "rgba(120,130,110,0.25)";
+      c.fillRect(x0 + o.x * s, y0 + o.y * s, Math.max(1.5, o.w * s), Math.max(1.5, o.h * s));
+    }
+
+    // camera view
+    c.strokeStyle = "rgba(232,224,200,0.16)";
+    c.lineWidth = 1;
+    c.strokeRect(x0 + (this.cam.x - this.w / 2) * s, y0 + (this.cam.y - this.h / 2) * s, this.w * s, this.h * s);
+
+    // pickups
+    for (const p of this.pickups) {
+      c.fillStyle = "#d4ff4d";
+      c.fillRect(x0 + p.x * s - 1.5, y0 + p.y * s - 1.5, 3, 3);
+    }
+    // hostiles
+    c.fillStyle = "#e5222e";
+    for (const z of this.zombies) {
+      if (z.kind === "boss") continue;
+      c.fillRect(x0 + z.x * s - 1, y0 + z.y * s - 1, 2, 2);
+    }
+    if (this.boss && !this.boss.dead) {
+      const pulse = 2.5 + Math.sin(this.time * 6) * 1.2;
+      c.fillStyle = "#ff4b52";
+      c.beginPath();
+      c.arc(x0 + this.boss.x * s, y0 + this.boss.y * s, pulse, 0, Math.PI * 2);
+      c.fill();
+    }
+    // player
+    const pxm = x0 + this.px * s;
+    const pym = y0 + this.py * s;
+    c.save();
+    c.translate(pxm, pym);
+    c.rotate(this.aim);
+    c.fillStyle = "#a3f52e";
+    c.beginPath();
+    c.moveTo(5, 0);
+    c.lineTo(-3.5, -3.5);
+    c.lineTo(-3.5, 3.5);
+    c.closePath();
+    c.fill();
+    c.restore();
+
+    c.font = "700 8px Oxanium, monospace";
+    c.textAlign = "left";
+    c.fillStyle = "rgba(163,245,46,0.55)";
+    c.fillText("TAC-MAP // SECTOR 9", x0 + 5, y0 + mh - 5);
+  }
+
   private drawCrosshair(c: CanvasRenderingContext2D) {
     const x = this.mouseX;
     const y = this.mouseY;
-    const gap = 7 + this.spreadKick * 9;
+    const gap = 7 + this.spreadKick * 9 + (this.sprinting ? 5 : 0);
     const col = this.ammo <= 0 && this.reloadT < 0 ? "#e5222e" : "#a3f52e";
     c.strokeStyle = col;
     c.lineWidth = 1.6;

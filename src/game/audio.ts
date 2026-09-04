@@ -123,6 +123,11 @@ export class SoundEngine {
     this.noise(0.1, 240, 0.16, 0.8, 90);
   }
 
+  step(sprint: boolean): void {
+    this.noise(0.045, sprint ? 560 : 430, sprint ? 0.055 : 0.04, 1.4, 160);
+    if (sprint) this.tone("sine", 90, 60, 0.05, 0.03);
+  }
+
   hurt(): void {
     this.tone("sawtooth", 110, 45, 0.3, 0.34);
     this.noise(0.2, 250, 0.26, 0.8, 70);

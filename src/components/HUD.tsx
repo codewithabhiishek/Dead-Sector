@@ -84,6 +84,23 @@ function HpPanel({ s }: { s: Snapshot }) {
           style={{ width: `${Math.max(0, frac * 100)}%` }}
         />
       </div>
+      {/* stamina */}
+      <div className={`mt-1.5 transition-opacity duration-300 ${s.stamina > 99 && !s.sprinting ? "opacity-45" : "opacity-100"}`}>
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="stencil text-[8px] text-bone/45">Stamina</span>
+          {s.sprinting && <span className="stencil text-[8px] text-ember animate-pulse">Sprinting</span>}
+        </div>
+        <div className="bar-track relative h-1.5 overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 bar-fill-generic"
+            style={{
+              width: `${s.stamina}%`,
+              background: s.stamina < 26 ? "linear-gradient(90deg,#8f4a12,#e5732e)" : "linear-gradient(90deg,#8a6a1e,#ffb347)",
+              boxShadow: s.sprinting ? "0 0 8px rgba(255,179,71,0.7)" : "none",
+            }}
+          />
+        </div>
+      </div>
       {s.shield > 0 && (
         <div className="mt-1.5 flex items-center gap-2">
           <ShieldIcon className="w-3.5 h-3.5 text-[#6be3ff]" />
@@ -278,12 +295,11 @@ export default function HUD() {
   if (s.phase !== "playing" && s.phase !== "paused") return null;
   return (
     <div className="absolute inset-0 pointer-events-none z-20 font-ui">
-      <div className="absolute top-4 left-4">
+      <div className="absolute top-4 left-4 flex flex-col gap-2 items-start">
         <HpPanel s={s} />
-      </div>
-      <div className="absolute top-4 right-4">
         <ScorePanel s={s} />
       </div>
+      {/* top-right is reserved for the canvas TAC-MAP */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2">
         <BossBar s={s} />
       </div>
