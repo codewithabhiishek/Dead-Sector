@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine } from "./game/engine";
+import { store } from "./game/store";
 import { useSnap } from "./components/HUD";
 import HUD from "./components/HUD";
 import { MenuScreen, PauseScreen, GameOverScreen, Banner, TouchControls } from "./components/Screens";
@@ -13,7 +14,28 @@ export default function App() {
     if (!canvasRef.current) return;
     const e = new Engine(canvasRef.current);
     setEngine(e);
-    return () => e.destroy();
+
+    const onKeyDown = (evt: KeyboardEvent) => {
+      if (evt.code === "KeyF" || evt.key === "f" || evt.key === "F") {
+        const target = evt.target as HTMLElement | null;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+        evt.preventDefault();
+        e.toggleFullscreen();
+      }
+    };
+
+    const onFsChange = () => {
+      store.set({ fullscreen: !!document.fullscreenElement });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("fullscreenchange", onFsChange);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("fullscreenchange", onFsChange);
+      e.destroy();
+    };
   }, []);
 
   return (

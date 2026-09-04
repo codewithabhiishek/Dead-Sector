@@ -51,6 +51,21 @@ function SoundIcon({ muted, className = "w-5 h-5" }: { muted: boolean; className
   );
 }
 
+function MaximizeIcon({ isFs, className = "w-5 h-5" }: { isFs: boolean; className?: string }) {
+  if (isFs) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
 function PlayIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -122,6 +137,8 @@ export function MenuScreen({ engine }: ScreenProps) {
     { label: "Aim · Fire", keys: ["MOUSE", "LMB"], desc: "Hold for full-auto" },
     { label: "Combat Dash", keys: ["SPACE"], desc: "Brief invulnerability" },
     { label: "Reload", keys: ["R"], desc: "Or auto when dry" },
+    { label: "Maximize", keys: ["F"], desc: "Toggle fullscreen" },
+    { label: "Audio", keys: ["M"], desc: "Mute / unmute" },
     { label: "Pause", keys: ["P"], desc: "Esc also works" },
   ];
 
@@ -243,11 +260,19 @@ export function MenuScreen({ engine }: ScreenProps) {
           <p className="mt-2.5 text-center stencil text-[9px] text-bone/50">{DIFFS[s.difficulty].blurb}</p>
         </section>
 
-        {/* deploy + sound — aligned row */}
-        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px] gap-2 rise-in rise-in-4">
+        {/* deploy + fullscreen + sound — aligned row */}
+        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px_56px] gap-2 rise-in rise-in-4">
           <button onClick={() => engine?.start(sel)} className="btn-deploy h-[56px] text-[15px] sm:text-base">
             {sel === 1 ? "Deploy" : sel === Math.min(s.unlocked, 10) && s.unlocked > 1 ? `Continue · Wave ${sel}` : `Deploy · Wave ${sel}`}
             <PlayIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => engine?.toggleFullscreen()}
+            className="btn-ghost h-[56px]"
+            aria-label={s.fullscreen ? "Exit Fullscreen (F)" : "Maximize Screen (F)"}
+            title={s.fullscreen ? "Restore window (F)" : "Maximize screen (F)"}
+          >
+            <MaximizeIcon isFs={s.fullscreen} />
           </button>
           <button
             onClick={() => engine?.toggleMute()}
@@ -259,7 +284,7 @@ export function MenuScreen({ engine }: ScreenProps) {
           </button>
         </div>
         <div className="mt-3 stencil text-[9px] text-bone/35 tabular-nums rise-in rise-in-3">
-          Best {s.best.toLocaleString()} pts · Wave {s.bestWave} · {s.muted ? "Audio off" : "Audio on"} (M)
+          Best {s.best.toLocaleString()} pts · Wave {s.bestWave} · Fullscreen (F) · {s.muted ? "Audio off" : "Audio on"} (M)
         </div>
 
         {/* intel panels — identical geometry */}
@@ -366,8 +391,26 @@ export function PauseScreen({ engine }: ScreenProps) {
           <button onClick={() => engine?.toMenu()} className="btn-danger py-3 text-[12px]">
             Abandon mission
           </button>
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <button
+              onClick={() => engine?.toggleFullscreen()}
+              className="btn-ghost py-2.5 text-[11px] flex items-center justify-center gap-1.5"
+              title="Maximize screen (F)"
+            >
+              <MaximizeIcon isFs={s.fullscreen} className="w-3.5 h-3.5" />
+              {s.fullscreen ? "Windowed (F)" : "Maximize (F)"}
+            </button>
+            <button
+              onClick={() => engine?.toggleMute()}
+              className="btn-ghost py-2.5 text-[11px] flex items-center justify-center gap-1.5"
+              title="Toggle audio (M)"
+            >
+              <SoundIcon muted={s.muted} className="w-3.5 h-3.5" />
+              {s.muted ? "Unmute (M)" : "Mute (M)"}
+            </button>
+          </div>
         </div>
-        <div className="mt-5 stencil text-[9px] text-bone/35">P / Esc to resume · M to mute</div>
+        <div className="mt-4 stencil text-[9px] text-bone/35">P / Esc to resume · F to maximize · M to mute</div>
       </div>
     </div>
   );

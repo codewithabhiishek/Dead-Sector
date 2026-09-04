@@ -82,6 +82,8 @@ As you eliminate hostiles, your combat tier advances automatically:
 | **Combat Dash** | <kbd>Space</kbd> | Grants brief invulnerability frames to slip through tight chokepoints. |
 | **Sprint** | <kbd>Shift</kbd> | Burns stamina for a quick burst of emergency speed. |
 | **Reload** | <kbd>R</kbd> | Reload during calm moments or wait for automatic reload on empty. |
+| **Maximize Screen** | <kbd>F</kbd> | Toggle full-screen immersive view anytime. |
+| **Toggle Audio** | <kbd>M</kbd> | Mute or unmute procedural synthesized sound effects. |
 | **Pause / Menu** | <kbd>P</kbd> or <kbd>Esc</kbd> | Freeze action and review combat telemetry. |
 
 ### Mobile Controls

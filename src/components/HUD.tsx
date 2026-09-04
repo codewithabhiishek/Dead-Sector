@@ -278,6 +278,7 @@ function StatusPanel({ s }: { s: Snapshot }) {
       >
         {DIFFS[s.difficulty].label} PROTOCOL
       </div>
+      <div className="stencil text-[8px] text-bone/25 pl-1 tracking-wider">[F] MAXIMIZE · [M] AUDIO</div>
     </div>
   );
 }

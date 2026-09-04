@@ -69,6 +69,7 @@ export interface Snapshot {
   waveClearHeal: boolean;
   difficulty: Difficulty;
   unlocked: number; // highest selectable wave (progress)
+  fullscreen: boolean;
 }
 
 const defaultSnap: Snapshot = {

@@ -489,6 +489,10 @@ export class Engine {
       this.toggleMute();
       return;
     }
+    if (c === "KeyF") {
+      this.toggleFullscreen();
+      return;
+    }
     if (c === "Enter" || c === "Space") {
       if (this.phase === "menu" || this.phase === "gameover") {
         if (c === "Enter" || (c === "Space" && this.phase === "gameover")) {
@@ -639,6 +643,16 @@ export class Engine {
     saveMuted(m);
     store.set({ muted: m });
     return m;
+  }
+
+  toggleFullscreen(): boolean {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      return true;
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      return false;
+    }
   }
 
   dashAction() {
