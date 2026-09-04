@@ -1,6 +1,16 @@
 /* DEAD SECTOR — canvas game engine. Scrolling world, camera follow, all visuals procedural. */
 
-import { store, loadBest, saveBest, loadMuted, saveMuted, type BannerMsg } from "./store";
+import {
+  store,
+  loadBest,
+  saveBest,
+  loadMuted,
+  saveMuted,
+  loadDifficulty,
+  saveDifficulty,
+  type BannerMsg,
+  type Difficulty,
+} from "./store";
 import { sfx } from "./audio";
 
 /* ---------------------------------- types ---------------------------------- */
@@ -26,6 +36,8 @@ interface Zombie {
   spitT: number;
   waypoint: { x: number; y: number } | null;
   waypointT: number;
+  prog: number; // time spent failing to close distance (anti-stuck tracker)
+  lastD: number;
   dead: boolean;
 }
 
@@ -138,6 +150,22 @@ const TIER_AT = [0, 12, 35, 75, 140]; // kills needed for tier index
 
 const COMBO_WINDOW = 2.2;
 
+export interface DiffSpec {
+  label: string;
+  hp: number;
+  dmg: number;
+  spd: number;
+  count: number;
+  score: number;
+  blurb: string;
+}
+
+export const DIFFS: Record<Difficulty, DiffSpec> = {
+  recruit: { label: "RECRUIT", hp: 0.7, dmg: 0.65, spd: 0.88, count: 0.75, score: 0.75, blurb: "Thinner horde · softer bites · score ×0.75" },
+  veteran: { label: "VETERAN", hp: 1, dmg: 1, spd: 1, count: 1, score: 1, blurb: "The intended nightmare · score ×1.0" },
+  nightmare: { label: "NIGHTMARE", hp: 1.4, dmg: 1.3, spd: 1.14, count: 1.3, score: 1.6, blurb: "Denser · faster · meaner · score ×1.6" },
+};
+
 const WORLD_W = 3400;
 const WORLD_H = 2300;
 const ROAD_Y = 1000; // horizontal road centerline
@@ -217,6 +245,10 @@ export class Engine {
   private ammo = WEAPONS[0].mag;
   private spreadKick = 0;
   private dead = false;
+  private hitT = 0;
+  private hitKillT = 0;
+  private diffKey: Difficulty = "veteran";
+  private surge = false;
 
   // progression
   private score = 0;
@@ -264,6 +296,7 @@ export class Engine {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     sfx.muted = loadMuted();
+    this.diffKey = loadDifficulty();
     this.buildTile();
     this.buildWorld();
     this.resize();
@@ -579,6 +612,14 @@ export class Engine {
     if (this.phase === "playing") this.dash();
   }
 
+  setDifficulty(k: Difficulty) {
+    this.diffKey = k;
+    saveDifficulty(k);
+    store.set({ difficulty: k });
+    sfx.unlock();
+    sfx.ui();
+  }
+
   setTouchMove(x: number, y: number, active: boolean) {
     this.touchVec.x = x;
     this.touchVec.y = y;
@@ -680,17 +721,26 @@ export class Engine {
   private startWave(n: number) {
     this.wave = n;
     const isBoss = n % 5 === 0;
-    let total = Math.min(70, Math.floor(5 + n * 3 + Math.pow(n, 1.18)));
+    this.surge = !isBoss && n >= 7 && n % 7 === 0;
+    let total = Math.min(95, Math.floor((6 + n * 3.2 + Math.pow(n, 1.24)) * DIFFS[this.diffKey].count));
     if (isBoss) total = Math.max(6, Math.floor(total * 0.55));
     this.toSpawn = total;
     this.spawnT = 1.1;
     this.intermission = -1;
-    sfx.waveHorn(isBoss);
-    this.banner(
-      isBoss ? "ABOMINATION DETECTED" : `WAVE ${n}`,
-      isBoss ? "MASSIVE SIGNATURE — BRACE" : `${total} HOSTILES INBOUND`,
-      isBoss ? "blood" : "toxic"
-    );
+    sfx.waveHorn(isBoss || this.surge);
+    const title = isBoss
+      ? "ABOMINATION DETECTED"
+      : this.surge
+        ? "MUTATION SURGE"
+        : n >= 10
+          ? `WAVE ${n} — NIGHTFALL`
+          : `WAVE ${n}`;
+    const sub = isBoss
+      ? "MASSIVE SIGNATURE — BRACE"
+      : this.surge
+        ? `${total} MUTATED HOSTILES — FAST & TOXIC`
+        : `${total} HOSTILES INBOUND`;
+    this.banner(title, sub, isBoss || this.surge ? "blood" : "toxic");
   }
 
   private banner(text: string, sub: string, tone: BannerMsg["tone"]) {
@@ -699,18 +749,21 @@ export class Engine {
   }
 
   private hpScale() {
-    return 1 + (this.wave - 1) * 0.16;
+    const linear = 1 + (this.wave - 1) * 0.2;
+    // exponential bite after wave 10 — levels keep getting meaner
+    return this.wave > 10 ? linear * Math.pow(1.07, this.wave - 10) : linear;
   }
 
   private spdScale() {
-    return 1 + Math.min(this.wave, 25) * 0.018;
+    return 1 + Math.min(this.wave, 40) * 0.022;
   }
 
   private pickKind(): ZKind {
     const r = Math.random();
-    const pBrute = this.wave >= 4 ? Math.min(0.16, 0.05 + this.wave * 0.012) : 0;
-    const pSpit = this.wave >= 3 ? Math.min(0.2, 0.07 + this.wave * 0.015) : 0;
-    const pRun = this.wave >= 2 ? Math.min(0.3, 0.1 + this.wave * 0.02) : 0;
+    if (this.surge) return r < 0.45 ? "spitter" : "runner";
+    const pBrute = this.wave >= 4 ? Math.min(0.2, 0.05 + this.wave * 0.014) : 0;
+    const pSpit = this.wave >= 3 ? Math.min(0.24, 0.07 + this.wave * 0.017) : 0;
+    const pRun = this.wave >= 2 ? Math.min(0.34, 0.1 + this.wave * 0.024) : 0;
     if (r < pBrute) return "brute";
     if (r < pBrute + pSpit) return "spitter";
     if (r < pBrute + pSpit + pRun) return "runner";
@@ -730,30 +783,55 @@ export class Engine {
       spitT: rand(1, 2.4),
       waypoint: null as { x: number; y: number } | null,
       waypointT: 0,
+      prog: 0,
+      lastD: 0,
       dead: false,
     };
-    const hs = this.hpScale() * hpMul;
-    const ss = this.spdScale();
+    const D = DIFFS[this.diffKey];
+    const hs = this.hpScale() * hpMul * D.hp;
+    const ss = this.spdScale() * D.spd;
+    const ds = (1 + Math.max(0, this.wave - 1) * 0.035) * D.dmg;
     switch (kind) {
       case "runner":
-        return { ...base, kind, r: 11, hp: 16 * hs, maxHp: 16 * hs, speed: rand(118, 148) * ss, dmg: 6, score: 15 };
+        return { ...base, kind, r: 11, hp: 16 * hs, maxHp: 16 * hs, speed: rand(118, 148) * ss, dmg: 6 * ds, score: 15 };
       case "spitter":
-        return { ...base, kind, r: 12, hp: 30 * hs, maxHp: 30 * hs, speed: rand(55, 68) * ss, dmg: 5, score: 25 };
+        return { ...base, kind, r: 12, hp: 30 * hs, maxHp: 30 * hs, speed: rand(55, 68) * ss, dmg: 5 * ds, score: 25 };
       case "brute":
-        return { ...base, kind, r: 24, hp: 150 * hs, maxHp: 150 * hs, speed: rand(34, 42) * ss, dmg: 22, score: 60 };
+        return { ...base, kind, r: 24, hp: 150 * hs, maxHp: 150 * hs, speed: rand(34, 42) * ss, dmg: 22 * ds, score: 60 };
       case "boss":
-        return { ...base, kind, r: 44, hp: 950 * (1 + (this.wave / 5 - 1) * 0.4), maxHp: 950 * (1 + (this.wave / 5 - 1) * 0.4), speed: 32 * ss, dmg: 30, score: 500 };
+        return {
+          ...base,
+          kind,
+          r: 44,
+          hp: 950 * (1 + (this.wave / 5 - 1) * 0.4) * D.hp,
+          maxHp: 950 * (1 + (this.wave / 5 - 1) * 0.4) * D.hp,
+          speed: 32 * ss,
+          dmg: 30 * ds,
+          score: 500,
+        };
       default:
-        return { ...base, kind, r: 14, hp: 26 * hs, maxHp: 26 * hs, speed: rand(52, 72) * ss, dmg: 8, score: 10 };
+        return { ...base, kind, r: 14, hp: 26 * hs, maxHp: 26 * hs, speed: rand(52, 72) * ss, dmg: 8 * ds, score: 10 };
     }
   }
 
   private spawnEdgePos(margin: number): { x: number; y: number } {
-    const a = rand(0, Math.PI * 2);
     const R = Math.hypot(this.w, this.h) / 2 + margin;
-    const x = clamp(this.cam.x + Math.cos(a) * R, 40, WORLD_W - 40);
-    const y = clamp(this.cam.y + Math.sin(a) * R * 0.85, 40, WORLD_H - 40);
-    return { x, y };
+    for (let i = 0; i < 24; i++) {
+      const a = rand(0, Math.PI * 2);
+      const x = clamp(this.px + Math.cos(a) * R, 30, WORLD_W - 30);
+      const y = clamp(this.py + Math.sin(a) * R * 0.85, 30, WORLD_H - 30);
+      // never spawn inside solid cover
+      if (!this.pointInSolid(x, y, 20)) return { x, y };
+    }
+    return { x: CX, y: clamp(CY - 300, 30, WORLD_H - 30) };
+  }
+
+  private pointInSolid(x: number, y: number, pad: number): boolean {
+    for (const o of this.obstacles) {
+      if (o.low) continue;
+      if (x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad) return true;
+    }
+    return false;
   }
 
   private spawnZombie() {
@@ -873,6 +951,8 @@ export class Engine {
 
     this.runT += dt;
     this.muzzleT = Math.max(0, this.muzzleT - dt);
+    this.hitT = Math.max(0, this.hitT - dt);
+    this.hitKillT = Math.max(0, this.hitKillT - dt);
     this.invulnT = Math.max(0, this.invulnT - dt);
     this.dashCd = Math.max(0, this.dashCd - dt);
     this.frenzyT = Math.max(0, this.frenzyT - dt);
@@ -1278,6 +1358,8 @@ export class Engine {
             life: 0.7,
             crit,
           });
+          this.hitT = 0.13;
+          sfx.hitmark();
           if (Math.random() < 0.4) sfx.zHit();
           if (z.hp <= 0) this.killZombie(z, ka);
           if (b.pierce > 0) b.pierce--;
@@ -1297,20 +1379,21 @@ export class Engine {
       if (this.intermission <= 0) this.startWave(this.wave + 1);
       return;
     }
-    const aliveCap = Math.min(85, 24 + this.wave * 4);
+    const aliveCap = Math.min(120, 26 + this.wave * 5);
     if (this.toSpawn > 0) {
       this.spawnT -= dt;
       if (this.spawnT <= 0 && this.zombies.length < aliveCap) {
-        const burst = this.wave >= 6 && Math.random() < 0.25 ? 2 : 1;
+        const burst =
+          this.wave >= 8 && Math.random() < 0.3 ? 3 : this.wave >= 5 && Math.random() < 0.35 ? 2 : 1;
         for (let i = 0; i < burst && this.toSpawn > 0; i++) {
           this.spawnZombie();
           this.toSpawn--;
         }
-        this.spawnT = Math.max(0.28, 1.45 - this.wave * 0.085) * rand(0.7, 1.3);
+        this.spawnT = Math.max(0.2, 1.3 - this.wave * 0.09) * rand(0.7, 1.3);
       }
     } else if (this.zombies.length === 0) {
       // wave cleared
-      const heal = 14;
+      const heal = 10;
       this.hp = Math.min(this.maxHp, this.hp + heal);
       this.stamina = 100;
       this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
@@ -1325,7 +1408,7 @@ export class Engine {
 
   private toSpawnInit(): number {
     const n = this.wave;
-    let total = Math.min(70, Math.floor(5 + n * 3 + Math.pow(n, 1.18)));
+    let total = Math.min(95, Math.floor((6 + n * 3.2 + Math.pow(n, 1.24)) * DIFFS[this.diffKey].count));
     if (n % 5 === 0) total = Math.max(6, Math.floor(total * 0.55));
     return total;
   }
@@ -1393,31 +1476,76 @@ export class Engine {
       // collide with the world
       const res = this.collideObs(z.x, z.y, z.r);
       if (res.hit && !z.waypoint) {
-        // route around the blocking obstacle via its best corner
+        // route around the blocking obstacle via its best *free* corner
         const o = res.hit;
         const corners = [
           { x: o.x - z.r - 6, y: o.y - z.r - 6 },
           { x: o.x + o.w + z.r + 6, y: o.y - z.r - 6 },
           { x: o.x - z.r - 6, y: o.y + o.h + z.r + 6 },
           { x: o.x + o.w + z.r + 6, y: o.y + o.h + z.r + 6 },
-        ];
-        let best = corners[0];
-        let bd = Infinity;
+        ].sort(
+          (p, q) =>
+            dist2(z.x, z.y, p.x, p.y) +
+            dist2(p.x, p.y, this.px, this.py) -
+            dist2(z.x, z.y, q.x, q.y) -
+            dist2(q.x, q.y, this.px, this.py)
+        );
         for (const cn of corners) {
-          const cost = dist2(z.x, z.y, cn.x, cn.y) + dist2(cn.x, cn.y, this.px, this.py);
-          if (cost < bd) {
-            bd = cost;
-            best = cn;
+          if (!this.pointInSolid(cn.x, cn.y, z.r)) {
+            z.waypoint = cn;
+            z.waypointT = 1.6;
+            break;
           }
         }
-        z.waypoint = best;
-        z.waypointT = 1.6;
       }
       z.x = res.x;
       z.y = res.y;
 
-      z.x = clamp(z.x, -60, WORLD_W + 60);
-      z.y = clamp(z.y, -60, WORLD_H + 60);
+      // hostiles can never leave the sector (no more unreachable stragglers)
+      z.x = clamp(z.x, 16, WORLD_W - 16);
+      z.y = clamp(z.y, 16, WORLD_H - 16);
+
+      // anti-stuck: if a hostile can't close distance for a while, it breaks through
+      const pd = Math.hypot(this.px - z.x, this.py - z.y);
+      if (!noPlayer && !this.dead && z.kind !== "spitter") {
+        if (z.lastD > 0 && pd > z.lastD - z.speed * dt * 0.35) z.prog += dt;
+        else z.prog = Math.max(0, z.prog - dt * 2);
+        if (z.prog > 4.5 && pd > 300) {
+          const a = rand(0, Math.PI * 2);
+          const rr = rand(230, 320);
+          const np = this.collideObs(
+            clamp(this.px + Math.cos(a) * rr, 20, WORLD_W - 20),
+            clamp(this.py + Math.sin(a) * rr, 20, WORLD_H - 20),
+            z.r
+          );
+          z.x = np.x;
+          z.y = np.y;
+          z.waypoint = null;
+          z.prog = 0;
+          for (let i = 0; i < 4; i++) {
+            this.particles.push({
+              kind: "smoke",
+              x: z.x,
+              y: z.y,
+              vx: rand(-40, 40),
+              vy: rand(-50, -10),
+              t: 0,
+              life: rand(0.3, 0.5),
+              size: rand(6, 11),
+              color: "rgba(120,150,90,0.28)",
+              rot: 0,
+              vr: 0,
+            });
+          }
+        }
+      }
+      z.lastD = pd;
+
+      // wounded hostiles drip blood on the asphalt
+      if (z.hp < z.maxHp * 0.45 && Math.random() < dt * 5) {
+        this.goreDecals.push({ x: z.x + rand(-6, 6), y: z.y + rand(-6, 6), r: rand(1.6, 3.6), c: "rgba(92,12,18,0.5)" });
+        if (this.goreDecals.length > 320) this.goreDecals.splice(0, this.goreDecals.length - 320);
+      }
 
       // attack player
       if (!noPlayer && !this.dead) {
@@ -1610,6 +1738,8 @@ export class Engine {
   private killZombie(z: Zombie, angle: number) {
     if (z.dead) return;
     z.dead = true;
+    this.hitKillT = 0.2;
+    sfx.killTick();
     const big = z.kind === "brute" || z.kind === "boss";
     this.kills++;
     this.combo++;
@@ -1620,7 +1750,7 @@ export class Engine {
       this.floatLabel(z.x, z.y - 20, `KILL STREAK ×${this.combo}`, "#d4ff4d");
     }
     const mult = 1 + Math.min(this.combo, 40) * 0.1;
-    const gained = Math.round(z.score * mult);
+    const gained = Math.round(z.score * mult * DIFFS[this.diffKey].score);
     this.score += gained;
     this.texts.push({
       x: z.x,
@@ -1841,6 +1971,7 @@ export class Engine {
       hurt: this.hurtT,
       lowHp: this.hp > 0 && this.hp < 30,
       time: this.runT,
+      difficulty: this.diffKey,
     };
     store.set(patch);
   }
@@ -1900,7 +2031,10 @@ export class Engine {
     // screen-space atmosphere
     this.drawFog(c);
     this.drawSpores(c);
-    if (this.phase !== "menu") this.drawMinimap(c);
+    if (this.phase !== "menu") {
+      this.drawIndicators(c);
+      this.drawMinimap(c);
+    }
     if (this.phase === "playing" && !this.isTouch) this.drawCrosshair(c);
   }
 
@@ -2062,14 +2196,37 @@ export class Engine {
     }
 
     // perimeter fence
+    c.strokeStyle = "rgba(0,0,0,0.6)";
+    c.lineWidth = 8;
+    c.strokeRect(-6, -6, WORLD_W + 12, WORLD_H + 12);
     c.strokeStyle = "rgba(163,245,46,0.22)";
     c.lineWidth = 4;
     c.setLineDash([30, 20]);
     c.strokeRect(0, 0, WORLD_W, WORLD_H);
     c.setLineDash([]);
-    c.strokeStyle = "rgba(0,0,0,0.6)";
-    c.lineWidth = 8;
-    c.strokeRect(-6, -6, WORLD_W + 12, WORLD_H + 12);
+    // fence posts
+    c.fillStyle = "#1a2416";
+    for (let x = 0; x <= WORLD_W; x += 170) {
+      c.fillRect(x - 5, -11, 10, 22);
+      c.fillRect(x - 5, WORLD_H - 11, 10, 22);
+    }
+    for (let y = 170; y < WORLD_H; y += 170) {
+      c.fillRect(-11, y - 5, 22, 10);
+      c.fillRect(WORLD_W - 11, y - 5, 22, 10);
+    }
+    // blinking perimeter warning lamps
+    const lampOn = Math.sin(this.time * 3.2) > -0.2 ? 1 : 0.15;
+    c.fillStyle = `rgba(229,34,46,${0.6 * lampOn})`;
+    for (const [lx, ly] of [
+      [0, 0],
+      [WORLD_W, 0],
+      [0, WORLD_H],
+      [WORLD_W, WORLD_H],
+    ] as const) {
+      c.beginPath();
+      c.arc(lx, ly, 7, 0, Math.PI * 2);
+      c.fill();
+    }
   }
 
   private drawObstacles(c: CanvasRenderingContext2D) {
@@ -2103,6 +2260,25 @@ export class Engine {
             c.lineTo(o.x + 68, o.y + 22 + i * 8.5);
             c.stroke();
           }
+          // roof vents + pipe run
+          c.fillStyle = o.col2;
+          c.beginPath();
+          c.arc(o.x + o.w * 0.5 + 42, o.y + 32, 10, 0, Math.PI * 2);
+          c.arc(o.x + o.w * 0.5 + 66, o.y + 32, 7, 0, Math.PI * 2);
+          c.fill();
+          c.strokeStyle = "rgba(0,0,0,0.4)";
+          c.lineWidth = 4;
+          c.beginPath();
+          c.moveTo(o.x + 30, o.y + o.h * 0.52);
+          c.lineTo(o.x + o.w - 40, o.y + o.h * 0.52);
+          c.stroke();
+          // flickering toxic skylight
+          const sky = 0.5 + 0.5 * Math.sin(this.time * 2.6 + o.seed);
+          c.fillStyle = `rgba(163,245,46,${0.05 + sky * 0.08})`;
+          c.fillRect(o.x + o.w * 0.3, o.y + o.h * 0.68, 26, 18);
+          c.strokeStyle = "rgba(0,0,0,0.5)";
+          c.lineWidth = 2;
+          c.strokeRect(o.x + o.w * 0.3, o.y + o.h * 0.68, 26, 18);
           if (o.seed % 3 === 0) {
             c.strokeStyle = "rgba(163,245,46,0.12)";
             c.lineWidth = 3;
@@ -2282,12 +2458,14 @@ export class Engine {
     const lx = this.phase === "menu" ? this.cam.x : this.px;
     const ly = this.phase === "menu" ? this.cam.y : this.py;
     const flicker = 1 + Math.sin(this.time * 11) * 0.015 + Math.sin(this.time * 3.7) * 0.02;
-    const inner = 120 * flicker;
-    const outer = 900;
+    // nightfall: the sector gets darker as waves climb
+    const night = this.phase === "menu" ? 0 : Math.min(1, Math.max(0, this.wave - 6) * 0.055);
+    const inner = (120 - night * 30) * flicker;
+    const outer = 900 - night * 170;
     const gr = c.createRadialGradient(lx, ly, inner, lx, ly, outer);
     gr.addColorStop(0, "rgba(3,7,5,0)");
-    gr.addColorStop(0.45, "rgba(3,7,5,0.34)");
-    gr.addColorStop(1, "rgba(2,5,3,0.9)");
+    gr.addColorStop(0.45, `rgba(3,7,5,${0.34 + night * 0.1})`);
+    gr.addColorStop(1, `rgba(2,5,3,${0.9 + night * 0.05})`);
     c.fillStyle = gr;
     c.fillRect(vx0, vy0, vx1 - vx0, vy1 - vy0);
   }
@@ -2395,11 +2573,12 @@ export class Engine {
     // arms
     const aimA = Math.atan2(this.py - z.y, this.px - z.x);
     const perp = aimA + Math.PI / 2;
-    const swing = Math.sin(z.phase * 1.4) * r * 0.3;
+    // arms reach hungrily toward the target
+    const swing = Math.sin(z.phase * 1.4) * r * 0.22;
     c.fillStyle = pal.dark;
     for (const s of [-1, 1]) {
-      const ax = Math.cos(perp) * r * 0.75 * s + Math.cos(aimA) * (r * 0.55 + swing * s);
-      const ay = Math.sin(perp) * r * 0.75 * s + Math.sin(aimA) * (r * 0.55 + swing * s);
+      const ax = Math.cos(perp) * r * 0.5 * s + Math.cos(aimA) * (r * 0.88 + swing * s);
+      const ay = Math.sin(perp) * r * 0.5 * s + Math.sin(aimA) * (r * 0.88 + swing * s);
       c.beginPath();
       c.arc(ax, ay, r * 0.32, 0, Math.PI * 2);
       c.fill();
@@ -2415,6 +2594,16 @@ export class Engine {
     c.lineWidth = 2;
     c.strokeStyle = "rgba(0,0,0,0.45)";
     c.stroke();
+
+    // rot spots (seeded per-hostile so they don't swim)
+    const sd = z.r * 7.31;
+    c.fillStyle = "rgba(16,26,10,0.42)";
+    for (let i = 0; i < 3; i++) {
+      const sa = sd + i * 2.1;
+      c.beginPath();
+      c.arc(Math.cos(sa) * r * 0.42, Math.sin(sa) * r * 0.42 + bob * 0.3, r * (0.12 + (i % 2) * 0.06), 0, Math.PI * 2);
+      c.fill();
+    }
 
     if (z.kind === "brute" || z.kind === "boss") {
       c.strokeStyle = "rgba(0,0,0,0.5)";
@@ -2794,6 +2983,61 @@ export class Engine {
     c.globalAlpha = 1;
   }
 
+  private drawIndicators(c: CanvasRenderingContext2D) {
+    // COD-style edge markers — no hostile can ever hide offscreen again
+    if (this.phase === "gameover") return;
+    const inset = 26;
+    const x0 = inset;
+    const y0 = inset + (this.boss ? 46 : 0);
+    const x1 = this.w - inset;
+    const y1 = this.h - inset;
+    const cx = this.w / 2;
+    const cy = this.h / 2;
+    let drawn = 0;
+    for (const z of this.zombies) {
+      if (z.dead || drawn >= 40) continue;
+      const sx = z.x - this.cam.x + cx;
+      const sy = z.y - this.cam.y + cy;
+      if (sx > x0 && sx < x1 && sy > y0 && sy < y1) continue;
+      const a = Math.atan2(sy - cy, sx - cx);
+      const tx = Math.cos(a);
+      const ty = Math.sin(a);
+      const sxr = Math.abs(tx) > 1e-6 ? (tx > 0 ? x1 - cx : x0 - cx) / tx : Infinity;
+      const syr = Math.abs(ty) > 1e-6 ? (ty > 0 ? y1 - cy : y0 - cy) / ty : Infinity;
+      const t = Math.min(Math.abs(sxr), Math.abs(syr));
+      const ex = cx + tx * t;
+      const ey = cy + ty * t;
+      const worldD = Math.hypot(z.x - this.px, z.y - this.py);
+      const alpha = clamp(1.15 - worldD / 1600, 0.3, 0.95);
+      const col =
+        z.kind === "boss"
+          ? "#ff4b52"
+          : z.kind === "spitter"
+            ? "#cdeb45"
+            : z.kind === "runner"
+              ? "#ffb347"
+              : z.kind === "brute"
+                ? "#e8e0c8"
+                : "#a3f52e";
+      const size = z.kind === "boss" ? 13 + Math.sin(this.time * 8) * 2.5 : z.kind === "brute" ? 10 : 7.5;
+      c.save();
+      c.translate(ex, ey);
+      c.rotate(a);
+      c.globalAlpha = alpha;
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(size, 0);
+      c.lineTo(-size * 0.7, size * 0.62);
+      c.lineTo(-size * 0.35, 0);
+      c.lineTo(-size * 0.7, -size * 0.62);
+      c.closePath();
+      c.fill();
+      c.restore();
+      drawn++;
+    }
+    c.globalAlpha = 1;
+  }
+
   private drawMinimap(c: CanvasRenderingContext2D) {
     if (this.w < 680) return; // too narrow — would overlap the vitals panel
     const mw = 178;
@@ -2885,6 +3129,22 @@ export class Engine {
       c.moveTo(x + Math.cos(a) * gap, y + Math.sin(a) * gap);
       c.lineTo(x + Math.cos(a) * (gap + 7), y + Math.sin(a) * (gap + 7));
       c.stroke();
+    }
+    // hitmarker — white flash on hit, red X on kill confirm
+    if (this.hitT > 0 || this.hitKillT > 0) {
+      const kill = this.hitKillT > 0;
+      const a = kill ? this.hitKillT / 0.2 : this.hitT / 0.13;
+      c.strokeStyle = kill ? "#ff4b52" : "#ffffff";
+      c.lineWidth = kill ? 2.4 : 1.8;
+      c.globalAlpha = Math.min(1, a * 1.2);
+      for (let i = 0; i < 4; i++) {
+        const an = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        c.beginPath();
+        c.moveTo(x + Math.cos(an) * 3.5, y + Math.sin(an) * 3.5);
+        c.lineTo(x + Math.cos(an) * 9.5, y + Math.sin(an) * 9.5);
+        c.stroke();
+      }
+      c.globalAlpha = 0.9;
     }
     if (this.reloadT >= 0) {
       const w = this.weapon();

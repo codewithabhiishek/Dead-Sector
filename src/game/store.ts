@@ -2,6 +2,8 @@
 
 export type Phase = "menu" | "playing" | "paused" | "gameover";
 
+export type Difficulty = "recruit" | "veteran" | "nightmare";
+
 export interface Buffs {
   frenzy: number; // seconds remaining
   power: number;
@@ -65,6 +67,7 @@ export interface Snapshot {
   stats: RunStats | null;
   muted: boolean;
   waveClearHeal: boolean;
+  difficulty: Difficulty;
 }
 
 const defaultSnap: Snapshot = {

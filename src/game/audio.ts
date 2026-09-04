@@ -123,6 +123,15 @@ export class SoundEngine {
     this.noise(0.1, 240, 0.16, 0.8, 90);
   }
 
+  hitmark(): void {
+    this.tone("square", 1250, 950, 0.035, 0.045);
+  }
+
+  killTick(): void {
+    this.tone("square", 880, 1320, 0.06, 0.08);
+    this.tone("square", 1760, 1760, 0.05, 0.045, 0.03);
+  }
+
   step(sprint: boolean): void {
     this.noise(0.045, sprint ? 560 : 430, sprint ? 0.055 : 0.04, 1.4, 160);
     if (sprint) this.tone("sine", 90, 60, 0.05, 0.03);
