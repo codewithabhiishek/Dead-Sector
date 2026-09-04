@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import type { Engine } from "../game/engine";
+import { DIFFS, type Engine } from "../game/engine";
+import type { Difficulty } from "../game/store";
 import { useSnap } from "./HUD";
 import { sfx } from "../game/audio";
 
@@ -142,7 +143,38 @@ export function MenuScreen({ engine }: ScreenProps) {
           </p>
         </div>
 
-        <div className="rise-in rise-in-1 mt-8 flex items-center gap-3">
+        <div className="rise-in rise-in-1 mt-8 flex flex-col items-center">
+          <div className="stencil text-[9px] text-bone/40 mb-2">Select difficulty</div>
+          <div className="flex gap-2">
+            {(["recruit", "veteran", "nightmare"] as Difficulty[]).map((k) => {
+              const active = s.difficulty === k;
+              const cls = !active
+                ? "btn-ghost opacity-70"
+                : k === "nightmare"
+                  ? "btn-danger"
+                  : k === "recruit"
+                    ? "btn-ghost"
+                    : "btn-primary";
+              return (
+                <button
+                  key={k}
+                  onClick={() => engine?.setDifficulty(k)}
+                  className={`chamfer-sm px-5 py-2.5 text-[12px] transition-all duration-150 ${cls}`}
+                  style={
+                    active && k === "recruit"
+                      ? { color: "#e8e0c8", borderColor: "rgba(232,224,200,0.8)", boxShadow: "0 0 18px rgba(232,224,200,0.25)" }
+                      : undefined
+                  }
+                >
+                  {DIFFS[k].label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="stencil text-[9px] text-bone/45 mt-2">{DIFFS[s.difficulty].blurb}</div>
+        </div>
+
+        <div className="rise-in rise-in-2 mt-5 flex items-center gap-3">
           <button
             onClick={() => engine?.start()}
             className="btn-primary chamfer px-10 py-4 text-lg"

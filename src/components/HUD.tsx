@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { store, type Snapshot } from "../game/store";
+import { DIFFS } from "../game/engine";
 
 export function useSnap(): Snapshot {
   return useSyncExternalStore(store.subscribe, store.get);
@@ -269,6 +270,13 @@ function StatusPanel({ s }: { s: Snapshot }) {
         </div>
       ))}
       <div className="stencil text-[9px] text-bone/35 pl-1 tabular-nums">T+{fmtTime(s.time)}</div>
+      <div
+        className={`stencil text-[9px] pl-1 ${
+          s.difficulty === "nightmare" ? "text-blood" : s.difficulty === "recruit" ? "text-bone/60" : "text-ember/80"
+        }`}
+      >
+        {DIFFS[s.difficulty].label} PROTOCOL
+      </div>
     </div>
   );
 }

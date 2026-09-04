@@ -103,6 +103,7 @@ const defaultSnap: Snapshot = {
   stats: null,
   muted: false,
   waveClearHeal: false,
+  difficulty: "veteran",
 };
 
 type Listener = () => void;
@@ -160,6 +161,23 @@ export function loadMuted(): boolean {
 export function saveMuted(m: boolean): void {
   try {
     localStorage.setItem("ds_muted", m ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadDifficulty(): Difficulty {
+  try {
+    const v = localStorage.getItem("ds_difficulty");
+    return v === "recruit" || v === "nightmare" ? v : "veteran";
+  } catch {
+    return "veteran";
+  }
+}
+
+export function saveDifficulty(d: Difficulty): void {
+  try {
+    localStorage.setItem("ds_difficulty", d);
   } catch {
     /* ignore */
   }
