@@ -146,51 +146,50 @@ export function MenuScreen({ engine }: ScreenProps) {
     { name: "WALKER", color: "#8fb05e", blurb: "Slow · relentless · swarms in numbers", score: 10, threat: 1, icon: <SkullIcon className="w-4 h-4" /> },
     { name: "RUNNER", color: "#e8a33d", blurb: "Fast flanker — closes distance quick", score: 15, threat: 2, icon: <SkullIcon className="w-4 h-4" /> },
     { name: "SPITTER", color: "#cdeb45", blurb: "Lobs corrosive acid from range", score: 25, threat: 3, icon: <SkullIcon className="w-4 h-4" /> },
-    { name: "BRUTE", color: "#d97b7b", blurb: "Armored — heavy hits, hard to drop", score: 60, threat: 4, icon: <SkullIcon className="w-4 h-4" /> },
     { name: "ABOMINATION", color: "#ff5257", blurb: "Boss · plasma volley · every 5th wave", score: 500, threat: 5, icon: <SkullIcon className="w-5 h-5" /> },
   ];
 
   return (
-    <div className="absolute inset-0 z-20 overflow-y-auto overflow-x-hidden">
+    <div className="absolute inset-0 z-20 flex flex-col justify-between items-center w-full h-[100dvh] max-h-[100dvh] px-3 py-2 sm:px-6 sm:py-2.5 md:px-8 md:py-2 overflow-y-auto md:overflow-hidden select-none box-border">
       {/* readability scrim behind the header */}
-      <div className="title-scrim absolute inset-x-0 top-0 h-[52vh] pointer-events-none" />
+      <div className="title-scrim absolute inset-x-0 top-0 h-[45vh] pointer-events-none" />
 
-      <div className="relative min-h-full flex flex-col items-center px-4 sm:px-8 py-7 sm:py-10">
-        {/* quarantine bar */}
-        <div className="hazard-stripe h-[3px] w-full max-w-[560px] opacity-70 rise-in" />
+      {/* primary viewport container */}
+      <div className="relative z-10 w-full max-w-[940px] flex-1 flex flex-col justify-between items-center min-h-0 py-0.5">
+        {/* 1. header & branding block */}
+        <div className="w-full flex flex-col items-center shrink-0 rise-in">
+          <div className="hazard-stripe h-[2px] w-full max-w-[440px] opacity-70" />
+          <div className="mt-1 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
+            <span className="stencil text-[8px] sm:text-[9px] text-blood/90 tracking-[0.2em]">
+              Classified · Biohazard Level 4 · Sector 9
+            </span>
+            <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
+          </div>
 
-        {/* classification strip */}
-        <div className="mt-4 flex items-center gap-2.5 rise-in">
-          <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
-          <span className="stencil text-[9px] sm:text-[10px] text-blood/90">
-            Classified · Biohazard Level 4 · Eyes Only
-          </span>
-          <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
+          <h1 className="title-flicker font-display text-toxic leading-none mt-0.5 text-center text-[clamp(2.1rem,4.4vh,4rem)] rise-in-1">
+            DEAD SECTOR
+          </h1>
+
+          <div className="flex items-center gap-2 mt-0.5 rise-in-1">
+            <span className="h-px w-6 sm:w-10 bg-toxic/40" />
+            <span className="stencil text-[8px] sm:text-[9px] text-bone/70">Quarantine Protocol</span>
+            <span className="h-px w-6 sm:w-10 bg-toxic/40" />
+          </div>
+          <p className="mt-0.5 max-w-md text-center text-[10px] sm:text-[11.5px] text-bone/65 font-medium tracking-wide leading-tight rise-in-2">
+            The wire is breached. Run the sector, use wreckage for cover, and out-gun the horde — <span className="text-acid font-bold">survive all 10 waves.</span>
+          </p>
         </div>
 
-        {/* title */}
-        <h1 className="title-flicker font-display text-toxic leading-none mt-4 text-center text-[clamp(3.2rem,10.5vw,7rem)] rise-in rise-in-1">
-          DEAD SECTOR
-        </h1>
-        <div className="mt-2.5 flex items-center gap-3 rise-in rise-in-1">
-          <span className="h-px w-10 sm:w-16 bg-toxic/40" />
-          <span className="stencil text-[10px] sm:text-[11px] text-bone/70">Sector 9 · Quarantine Protocol</span>
-          <span className="h-px w-10 sm:w-16 bg-toxic/40" />
-        </div>
-        <p className="mt-5 max-w-md text-center text-[13px] sm:text-sm text-bone/65 font-medium tracking-wide leading-relaxed rise-in rise-in-2">
-          The wire is breached. Run the open sector, use the wrecks for cover, and out-gun the
-          horde — <span className="text-acid font-bold">survive all 10 waves.</span>
-        </p>
-
-        {/* mission select */}
-        <section className="mt-8 w-full max-w-[560px] rise-in rise-in-2" aria-label="Mission select">
-          <div className="flex items-center justify-between mb-2 px-0.5">
-            <span className="stencil text-[9px] text-bone/45">Mission Select</span>
-            <span className="stencil text-[9px] text-bone/30 tabular-nums">
+        {/* 2. mission select (single row on desktop) */}
+        <section className="w-full max-w-[620px] shrink-0 rise-in rise-in-2 my-0.5 sm:my-1" aria-label="Mission select">
+          <div className="flex items-center justify-between mb-1 px-1">
+            <span className="stencil text-[8px] sm:text-[8.5px] text-bone/45">Mission Select</span>
+            <span className="stencil text-[8px] sm:text-[8.5px] text-bone/30 tabular-nums">
               Progress · Wave {Math.min(s.unlocked, 10)}/10 unlocked
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 md:grid-cols-10 gap-1 sm:gap-1.5">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((w) => {
               const locked = w > s.unlocked;
               const boss = w % 5 === 0;
@@ -205,162 +204,185 @@ export function MenuScreen({ engine }: ScreenProps) {
                   className={`wave-cell ${active ? "is-active" : ""} ${boss ? "is-boss" : ""}`}
                   title={locked ? `Locked — clear wave ${w - 1} first` : `Deploy into wave ${w}`}
                 >
-                  <span className="stencil text-[7px] opacity-70">Wave</span>
-                  <span className="text-xl font-extrabold leading-none tabular-nums">
+                  <span className="stencil text-[6.5px] opacity-70 leading-none">W</span>
+                  <span className="text-sm sm:text-base font-extrabold leading-none tabular-nums">
                     {String(w).padStart(2, "0")}
                   </span>
-                  <span className="h-4 grid place-items-center">
+                  <span className="h-3 grid place-items-center">
                     {locked ? (
-                      <LockIcon className="w-3 h-3" />
+                      <LockIcon className="w-2.5 h-2.5" />
                     ) : boss ? (
-                      <SkullIcon className="w-3.5 h-3.5" />
+                      <SkullIcon className="w-3 h-3 text-blood" />
                     ) : cleared ? (
-                      <CheckIcon className="w-3 h-3" />
+                      <CheckIcon className="w-2.5 h-2.5" />
                     ) : (
-                      <span className="w-1 h-1 bg-current rounded-full" />
+                      <span className="w-1 h-1 bg-current rounded-full opacity-60" />
                     )}
                   </span>
                 </button>
               );
             })}
           </div>
-          <p className="mt-2.5 text-center stencil text-[9px] text-bone/50">
+          <p className="mt-1 text-center stencil text-[7.5px] sm:text-[8px] text-bone/45">
             {sel % 5 === 0
               ? `Warning — boss signature detected on wave ${sel}`
               : `Insertion point · wave ${sel} — armament scales with wave`}
           </p>
         </section>
 
-        {/* difficulty selector */}
-        <section className="mt-6 w-full max-w-[432px] rise-in rise-in-3" aria-label="Difficulty selection">
-          <div className="flex items-center justify-between mb-2 px-0.5">
-            <span className="stencil text-[9px] text-bone/45">Select Difficulty</span>
-            <span className="stencil text-[9px] text-bone/30">03 Protocols</span>
+        {/* 3. difficulty + deploy controls */}
+        <div className="w-full max-w-[430px] shrink-0 flex flex-col items-center rise-in rise-in-3 my-0.5 sm:my-1">
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-1 px-1">
+              <span className="stencil text-[8px] sm:text-[8.5px] text-bone/45">Select Difficulty</span>
+              <span className="stencil text-[8px] sm:text-[8.5px] text-bone/30">03 Protocols</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(["recruit", "veteran", "nightmare"] as Difficulty[]).map((k) => {
+                const active = s.difficulty === k;
+                return (
+                  <button
+                    key={k}
+                    onClick={() => engine?.setDifficulty(k)}
+                    data-active={active}
+                    className={`btn-diff ${k === "nightmare" ? "danger" : ""}`}
+                    aria-pressed={active}
+                  >
+                    <span className="flex items-center gap-1 leading-none text-[9px] sm:text-[10px]">
+                      <span className="diff-dot" />
+                      {DIFFS[k].label}
+                    </span>
+                    <span className="diff-sub text-[7px] sm:text-[7.5px] mt-0.5">Score ×{DIFFS[k].score}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {(["recruit", "veteran", "nightmare"] as Difficulty[]).map((k) => {
-              const active = s.difficulty === k;
-              return (
-                <button
-                  key={k}
-                  onClick={() => engine?.setDifficulty(k)}
-                  data-active={active}
-                  className={`btn-diff ${k === "nightmare" ? "danger" : ""}`}
-                  aria-pressed={active}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="diff-dot" />
-                    {DIFFS[k].label}
-                  </span>
-                  <span className="diff-sub">Score ×{DIFFS[k].score}</span>
-                </button>
-              );
-            })}
+
+          <div className="w-full grid grid-cols-[1fr_42px_42px] sm:grid-cols-[1fr_46px_46px] gap-2 mt-1.5">
+            <button
+              onClick={() => engine?.start(sel)}
+              className="btn-deploy h-[42px] sm:h-[46px] text-[13px] sm:text-[14px]"
+            >
+              {sel === 1 ? "Deploy" : sel === Math.min(s.unlocked, 10) && s.unlocked > 1 ? `Continue · Wave ${sel}` : `Deploy · Wave ${sel}`}
+              <PlayIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => engine?.toggleFullscreen()}
+              className="btn-ghost h-[42px] sm:h-[46px]"
+              aria-label={s.fullscreen ? "Exit Fullscreen (F)" : "Maximize Screen (F)"}
+              title={s.fullscreen ? "Restore window (F)" : "Maximize screen (F)"}
+            >
+              <MaximizeIcon isFs={s.fullscreen} className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => engine?.toggleMute()}
+              className="btn-ghost h-[42px] sm:h-[46px]"
+              aria-label={s.muted ? "Unmute" : "Mute"}
+              title="Toggle audio (M)"
+            >
+              <SoundIcon muted={s.muted} className="w-4 h-4" />
+            </button>
           </div>
-          <p className="mt-2.5 text-center stencil text-[9px] text-bone/50">{DIFFS[s.difficulty].blurb}</p>
-        </section>
-
-        {/* deploy + fullscreen + sound — aligned row */}
-        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px_56px] gap-2 rise-in rise-in-4">
-          <button onClick={() => engine?.start(sel)} className="btn-deploy h-[56px] text-[15px] sm:text-base">
-            {sel === 1 ? "Deploy" : sel === Math.min(s.unlocked, 10) && s.unlocked > 1 ? `Continue · Wave ${sel}` : `Deploy · Wave ${sel}`}
-            <PlayIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => engine?.toggleFullscreen()}
-            className="btn-ghost h-[56px]"
-            aria-label={s.fullscreen ? "Exit Fullscreen (F)" : "Maximize Screen (F)"}
-            title={s.fullscreen ? "Restore window (F)" : "Maximize screen (F)"}
-          >
-            <MaximizeIcon isFs={s.fullscreen} />
-          </button>
-          <button
-            onClick={() => engine?.toggleMute()}
-            className="btn-ghost h-[56px]"
-            aria-label={s.muted ? "Unmute" : "Mute"}
-            title="Toggle audio (M)"
-          >
-            <SoundIcon muted={s.muted} />
-          </button>
-        </div>
-        <div className="mt-3 stencil text-[9px] text-bone/35 tabular-nums rise-in rise-in-3">
-          Best {s.best.toLocaleString()} pts · Wave {s.bestWave} · Fullscreen (F) · {s.muted ? "Audio off" : "Audio on"} (M)
+          <div className="mt-1 stencil text-[8px] sm:text-[8.5px] text-bone/35 tabular-nums text-center">
+            Best {s.best.toLocaleString()} pts · Wave {s.bestWave} · Fullscreen (F) · {s.muted ? "Audio off" : "Audio on"} (M)
+          </div>
         </div>
 
-        {/* intel panels — identical geometry */}
-        <div className="mt-9 w-full max-w-[880px] grid gap-3 md:grid-cols-2 items-stretch rise-in rise-in-4">
-          <section className="panel p-4 sm:p-5">
-            <header className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TargetIcon className="w-4 h-4 text-toxic/80" />
-                <h2 className="stencil text-[11px] text-bone">Field Manual</h2>
+        {/* 4. intel panels — matching heights, side-by-side on desktop */}
+        <div className="w-full max-w-[880px] min-h-0 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3.5 items-stretch my-0.5 sm:my-1 rise-in rise-in-4">
+          <section className="panel p-2.5 sm:p-3 flex flex-col justify-between">
+            <header className="flex items-center justify-between mb-1 pb-1 border-b border-bone/10">
+              <div className="flex items-center gap-1.5">
+                <TargetIcon className="w-3.5 h-3.5 text-toxic/80" />
+                <h2 className="stencil text-[10px] text-bone">Field Manual</h2>
               </div>
-              <span className="stencil text-[8px] text-bone/30">Ref 7-A</span>
+              <span className="stencil text-[7.5px] text-bone/30">Ref 7-A</span>
             </header>
-            <ul className="space-y-2.5">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 my-auto">
               {controls.map((c) => (
-                <li key={c.label} className="flex items-center justify-between gap-3 py-0.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="flex gap-1 shrink-0">
+                <div key={c.label} className="flex items-center justify-between gap-1 py-0.5">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="flex gap-0.5 shrink-0">
                       {c.keys.map((k) => (
-                        <kbd key={k} className="keycap">
+                        <kbd key={k} className="keycap text-[8px] sm:text-[8.5px] min-w-[18px] h-[18px] px-1 py-0 leading-none">
                           {k}
                         </kbd>
                       ))}
                     </span>
-                    <span className="stencil text-[10px] text-bone/85 whitespace-nowrap">{c.label}</span>
+                    <span className="stencil text-[8.5px] text-bone/85 whitespace-nowrap">{c.label}</span>
                   </div>
-                  <span className="text-[11px] text-bone/40 text-right truncate">{c.desc}</span>
-                </li>
+                  <span className="text-[9px] text-bone/40 text-right truncate">{c.desc}</span>
+                </div>
               ))}
-            </ul>
-            <p className="mt-4 pt-3 border-t border-bone/10 text-[10px] text-bone/35 leading-relaxed">
-              Tip: chain kills within 2.2s for a ×5 combo · sprinting widens your spread · cover
-              blocks bullets but not acid.
+            </div>
+            <p className="mt-1 pt-1 border-t border-bone/10 text-[8px] sm:text-[8.5px] text-bone/35 leading-tight">
+              Tip: chain kills within 2.2s for ×5 combo · cover blocks bullets but not acid.
             </p>
           </section>
 
-          <section className="panel panel-red p-4 sm:p-5">
-            <header className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <SkullIcon className="w-4 h-4 text-blood/90" />
-                <h2 className="stencil text-[11px] text-bone">Threat Intel</h2>
+          <section className="panel panel-red p-2.5 sm:p-3 flex flex-col justify-between">
+            <header className="flex items-center justify-between mb-1 pb-1 border-b border-bone/10">
+              <div className="flex items-center gap-1.5">
+                <SkullIcon className="w-3.5 h-3.5 text-blood/90" />
+                <h2 className="stencil text-[10px] text-bone">Threat Intel</h2>
               </div>
-              <span className="stencil text-[8px] text-bone/30">Intel 09</span>
+              <span className="stencil text-[7.5px] text-bone/30">Intel 09</span>
             </header>
-            <ul className="space-y-2">
+            <div className="flex flex-col gap-1 my-auto">
               {threats.map((t) => (
-                <li key={t.name} className="flex items-center gap-3 py-0.5">
+                <div key={t.name} className="flex items-center gap-2 py-0.5">
                   <span
-                    className="w-9 h-9 shrink-0 grid place-items-center border bg-black/30 rounded-[3px]"
+                    className="w-5 h-5 shrink-0 grid place-items-center border bg-black/40 rounded-[2px]"
                     style={{ borderColor: `${t.color}44`, color: t.color }}
                   >
                     {t.icon}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-bold tracking-wider" style={{ color: t.color }}>
+                  <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10px] font-bold tracking-wider leading-none" style={{ color: t.color }}>
                         {t.name}
                       </span>
                       <ThreatPips level={t.threat} />
                     </div>
-                    <div className="text-[10px] text-bone/40 truncate">{t.blurb}</div>
+                    <span className="text-[9px] text-bone/45 truncate hidden sm:inline">{t.blurb}</span>
                   </div>
-                  <span className="stencil text-[9px] text-ember/80 tabular-nums shrink-0">+{t.score}</span>
-                </li>
+                  <span className="stencil text-[8px] text-ember/80 tabular-nums shrink-0">+{t.score}</span>
+                </div>
               ))}
-            </ul>
-            <p className="mt-4 pt-3 border-t border-bone/10 text-[10px] text-bone/35 leading-relaxed">
-              Waves 5–7 escalate sharply · Wave 10: the Patriarch. Clear all ten to enter Overtime.
+            </div>
+            <p className="mt-1 pt-1 border-t border-bone/10 text-[8px] sm:text-[8.5px] text-bone/35 leading-tight">
+              Waves 5–7 escalate sharply · Wave 10: Patriarch boss. Clear all 10 to survive.
             </p>
           </section>
         </div>
 
-        {/* footer */}
-        <footer className="mt-8 mb-1 flex flex-col items-center gap-2 rise-in rise-in-4">
-          <div className="hazard-stripe h-[3px] w-full max-w-[560px] opacity-40" />
-          <span className="stencil text-[8px] text-bone/25">
-            Build 2.7 · Containment net uplink stable · Sector 9
+        {/* 5. subtle footer bar positioned strictly within the viewport */}
+        <footer className="w-full flex items-center justify-between px-2 pt-1 pb-0.5 shrink-0 border-t border-bone/10 text-bone/40 rise-in rise-in-4">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-toxic/70 blink-lamp shadow-[0_0_6px_#a3f52e]" />
+            <span className="stencil text-[8px] text-bone/35 tracking-wider hidden sm:inline">
+              SECTOR 9 UPLINK ACTIVE
+            </span>
+          </div>
+
+          <a
+            href="https://abhiishek.is-a.dev/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Visit Abhishek's Portfolio (abhiishek.is-a.dev)"
+            className="group inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-toxic/30 bg-black/40 hover:bg-toxic/15 hover:border-toxic/70 transition-all duration-200 cursor-pointer shadow-[0_0_8px_rgba(163,245,46,0.1)] hover:shadow-[0_0_14px_rgba(163,245,46,0.3)]"
+          >
+            <span className="stencil text-[8.5px] font-extrabold tracking-[0.18em] text-toxic/90 group-hover:text-toxic transition-colors">
+              BUILT BY ABHISHEK
+            </span>
+            <span className="text-[9.5px] text-toxic/70 group-hover:text-toxic group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200">
+              ↗
+            </span>
+          </a>
+
+          <span className="stencil text-[8px] text-bone/30 tabular-nums">
+            V1.0 · PC PROTOCOL
           </span>
         </footer>
       </div>
