@@ -83,11 +83,21 @@ export class SoundEngine {
   /* ------------ game events ------------ */
 
   shoot(tier: number): void {
-    if (tier === 2) {
+    if (tier === 6) {
+      // railgun — capacitor discharge crack
+      this.tone("sawtooth", 950, 160, 0.2, 0.3);
+      this.tone("square", 2300, 280, 0.13, 0.13);
+      this.noise(0.22, 3200, 0.22, 2.2, 700);
+      this.tone("sine", 70, 34, 0.3, 0.32, 0.02);
+    } else if (tier === 5) {
+      // incinerator — pressurized roar
+      this.noise(0.24, 750, 0.32, 0.7, 240);
+      this.tone("sawtooth", 130, 55, 0.2, 0.14);
+    } else if (tier === 2) {
       // shotgun boom
       this.noise(0.16, 900, 0.5, 0.8, 200);
       this.tone("square", 130, 50, 0.14, 0.3);
-    } else if (tier >= 4) {
+    } else if (tier === 4) {
       this.noise(0.07, 1600, 0.3, 1.2, 500);
       this.tone("square", 220 + Math.random() * 40, 90, 0.06, 0.18);
     } else {

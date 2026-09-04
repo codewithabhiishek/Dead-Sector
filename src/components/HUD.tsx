@@ -68,7 +68,7 @@ function HpPanel({ s }: { s: Snapshot }) {
   const frac = s.hp / s.maxHp;
   const critical = s.hp <= 30;
   return (
-    <div className="hud-panel chamfer px-4 py-3 w-[240px]">
+    <div className="hud-panel corners px-4 py-3 w-[240px]">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Biohazard className={`w-5 h-5 ${critical ? "text-blood" : "text-toxic"}`} />
@@ -79,7 +79,7 @@ function HpPanel({ s }: { s: Snapshot }) {
           <span className="text-[10px] text-bone/50 font-semibold">/{s.maxHp}</span>
         </span>
       </div>
-      <div className="bar-track chamfer-sm relative h-3.5 stripes overflow-hidden">
+      <div className="bar-track relative h-3.5 stripes overflow-hidden">
         <div
           className={`bar-fill-hp absolute inset-y-0 left-0 ${critical ? "critical" : ""}`}
           style={{ width: `${Math.max(0, frac * 100)}%` }}
@@ -120,7 +120,7 @@ function HpPanel({ s }: { s: Snapshot }) {
 function ScorePanel({ s }: { s: Snapshot }) {
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="hud-panel chamfer px-4 py-2.5 min-w-[210px]">
+      <div className="hud-panel corners px-4 py-2.5 min-w-[210px]">
         <div className="flex items-center justify-between gap-6">
           <span className="stencil text-[10px] text-toxic/80">Score</span>
           <span className="font-extrabold text-2xl leading-none text-acid tabular-nums">
@@ -133,7 +133,7 @@ function ScorePanel({ s }: { s: Snapshot }) {
         </div>
       </div>
       {s.combo > 1 && (
-        <div key={s.combo} className="hud-panel chamfer-sm combo-pop px-3 py-2 border-ember/50! min-w-[170px]">
+        <div key={s.combo} className="hud-panel combo-pop px-3 py-2 border-ember/50! min-w-[170px]">
           <div className="flex items-center justify-between gap-4">
             <span className="stencil text-[10px] text-ember">Combo</span>
             <span className="font-extrabold text-xl leading-none text-ember tabular-nums">
@@ -148,7 +148,7 @@ function ScorePanel({ s }: { s: Snapshot }) {
           </div>
         </div>
       )}
-      <div className="hud-panel chamfer-sm px-3 py-2 min-w-[170px]">
+      <div className="hud-panel px-3 py-2 min-w-[170px]">
         <div className="flex items-center justify-between gap-4">
           <span className="stencil text-[10px] text-toxic/80">
             {s.wave <= 10 ? `Wave ${s.wave} / 10` : `Wave ${s.wave} · OT`}
@@ -166,19 +166,18 @@ function ScorePanel({ s }: { s: Snapshot }) {
 function WeaponPanel({ s }: { s: Snapshot }) {
   const reloading = s.reloading >= 0;
   return (
-    <div className="hud-panel chamfer px-4 py-3 w-[250px]">
+    <div className="hud-panel corners px-4 py-3 w-[250px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <BulletIcon className={`w-4 h-4 shrink-0 ${reloading ? "text-ember" : "text-toxic"}`} />
           <span className="stencil text-[10px] text-toxic/80 truncate">{s.weapon}</span>
         </div>
-        <div className="flex gap-1">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <span
-              key={i}
-              className={`w-1.5 h-3 skew-x-[-12deg] ${i <= s.weaponTier ? "bg-acid" : "bg-bone/15"}`}
-            />
-          ))}
+        <div className="flex gap-[3px] items-end">
+          {Array.from({ length: 7 }).map((_, i) => {
+            const on = i <= s.weaponTier;
+            const col = !on ? "bg-bone/15" : i === 6 ? "bg-[#7ce7ff]" : i === 5 ? "bg-ember" : "bg-acid";
+            return <span key={i} className={`w-1.5 skew-x-[-12deg] ${i >= 5 ? "h-3.5" : "h-3"} ${col}`} />;
+          })}
         </div>
       </div>
       <div className="flex items-end justify-between mt-1">
@@ -231,7 +230,7 @@ function StatusPanel({ s }: { s: Snapshot }) {
   if (s.buffs.shield > 0) buffs.push({ key: "s", label: "SHIELD", v: s.buffs.shield, max: 6, col: "#6be3ff" });
   return (
     <div className="flex flex-col gap-2 items-start">
-      <div className="hud-panel chamfer-sm px-3 py-2 w-[190px]">
+      <div className="hud-panel px-3 py-2 w-[190px]">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <DashIcon className={`w-4 h-4 ${s.dashFrac >= 1 ? "text-acid" : "text-bone/40"}`} />
@@ -253,7 +252,7 @@ function StatusPanel({ s }: { s: Snapshot }) {
         </div>
       </div>
       {buffs.map((b) => (
-        <div key={b.key} className="hud-panel chamfer-sm px-3 py-1.5 w-[190px]">
+        <div key={b.key} className="hud-panel px-3 py-1.5 w-[190px]">
           <div className="flex items-center justify-between">
             <span className="stencil text-[10px]" style={{ color: b.col }}>
               <Bolt className="w-3 h-3 inline -mt-0.5 mr-1" />
@@ -293,7 +292,7 @@ function BossBar({ s }: { s: Snapshot }) {
         </span>
         <span className="text-[11px] font-bold text-blood/80 tabular-nums">{Math.ceil(s.boss.frac * 100)}%</span>
       </div>
-      <div className="bar-track chamfer-sm relative h-3 overflow-hidden border-blood/50!">
+      <div className="bar-track relative h-3 overflow-hidden border-blood/50!">
         <div className="boss-fill absolute inset-y-0 left-0" style={{ width: `${s.boss.frac * 100}%` }} />
       </div>
     </div>

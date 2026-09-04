@@ -38,6 +38,8 @@ interface Zombie {
   waypointT: number;
   prog: number; // time spent failing to close distance (anti-stuck tracker)
   lastD: number;
+  burnT: number; // incinerator burn time remaining
+  burnDps: number;
   dead: boolean;
 }
 
@@ -810,6 +812,8 @@ export class Engine {
       waypointT: 0,
       prog: 0,
       lastD: 0,
+      burnT: 0,
+      burnDps: 0,
       dead: false,
     };
     const D = DIFFS[this.diffKey];
@@ -1286,9 +1290,13 @@ export class Engine {
     this.ammo--;
     this.shots += w.pellets;
     const spread = w.spread + this.spreadKick * 0.05 + (this.sprinting ? 0.05 : 0) + (this.moving ? 0.02 : 0);
-    const mx = this.px + Math.cos(this.aim) * 24;
-    const my = this.py + Math.sin(this.aim) * 24;
+    const mOff = this.tier === 6 ? 30 : this.tier === 5 ? 27 : 24;
+    const mx = this.px + Math.cos(this.aim) * mOff;
+    const my = this.py + Math.sin(this.aim) * mOff;
     const dmgMul = this.powerT > 0 ? 1.75 : 1;
+    const col =
+      this.tier === 6 ? "#7ce7ff" : this.tier === 5 ? "#ff8b3d" : this.tier === 2 ? "#ffcf8a" : "#ffe9a8";
+    const bw = this.tier === 6 ? 4 : this.tier === 5 ? 3.4 : this.tier === 2 ? 2.4 : 2;
     for (let i = 0; i < w.pellets; i++) {
       const a = this.aim + rand(-spread, spread);
       const spd = w.speed * rand(0.92, 1.08);
@@ -1299,8 +1307,10 @@ export class Engine {
         vy: Math.sin(a) * spd,
         dmg: w.dmg * dmgMul * rand(0.9, 1.1),
         pierce: w.pierce,
-        life: 0.95,
+        life: this.tier === 5 ? 0.55 : 0.95,
         hitIds: new Set(),
+        col,
+        w: bw,
       });
     }
     this.muzzleT = 0.05;
@@ -1374,6 +1384,31 @@ export class Engine {
           z.hp -= dmg;
           z.flashT = 0.09;
           const ka = Math.atan2(b.vy, b.vx);
+          // incinerator rounds ignite the target
+          if (this.tier === 5) {
+            z.burnT = 2.2;
+            z.burnDps = 9 * (this.powerT > 0 ? 1.75 : 1);
+          }
+          // railgun impact — cyan spark burst + shove
+          if (b.w >= 4) {
+            for (let i = 0; i < 6; i++) {
+              const sa = ka + rand(-1.1, 1.1);
+              this.particles.push({
+                kind: "spark",
+                x: b.x,
+                y: b.y,
+                vx: Math.cos(sa) * rand(120, 320),
+                vy: Math.sin(sa) * rand(120, 320),
+                t: 0,
+                life: rand(0.15, 0.3),
+                size: 1.8,
+                color: "#7ce7ff",
+                rot: 0,
+                vr: 0,
+              });
+            }
+            this.addShake(3, 0.1);
+          }
           const kb = z.kind === "brute" || z.kind === "boss" ? 14 : 90;
           z.x += Math.cos(ka) * kb * 0.1;
           z.y += Math.sin(ka) * kb * 0.1;
@@ -1455,6 +1490,31 @@ export class Engine {
       z.lungeT = Math.max(0, z.lungeT - dt);
       z.waypointT = Math.max(0, z.waypointT - dt);
       z.phase += dt * (z.kind === "runner" ? 11 : 5);
+
+      // burning damage over time
+      if (z.burnT > 0 && !noPlayer) {
+        z.burnT -= dt;
+        z.hp -= z.burnDps * dt;
+        if (Math.random() < dt * 13) {
+          this.particles.push({
+            kind: "spark",
+            x: z.x + rand(-z.r * 0.6, z.r * 0.6),
+            y: z.y + rand(-z.r * 0.6, z.r * 0.6),
+            vx: rand(-24, 24),
+            vy: rand(-95, -40),
+            t: 0,
+            life: rand(0.2, 0.42),
+            size: 2,
+            color: Math.random() < 0.5 ? "#ff8b3d" : "#ffd166",
+            rot: 0,
+            vr: 0,
+          });
+        }
+        if (z.hp <= 0 && !z.dead) {
+          this.killZombie(z, rand(0, Math.PI * 2));
+          continue;
+        }
+      }
 
       // steer toward waypoint (obstacle avoidance) or player
       let tx = this.px;
@@ -2685,6 +2745,14 @@ export class Engine {
       c.fill();
     }
 
+    // burning overlay
+    if (z.burnT > 0) {
+      c.fillStyle = `rgba(255,120,40,${0.24 + 0.1 * Math.sin(this.time * 21 + z.r)})`;
+      c.beginPath();
+      c.arc(0, bob * 0.3, r * 0.95, 0, Math.PI * 2);
+      c.fill();
+    }
+
     if (z.kind === "brute" || z.kind === "boss") {
       c.strokeStyle = "rgba(0,0,0,0.5)";
       c.lineWidth = 3;
@@ -2798,19 +2866,7 @@ export class Engine {
     // gun
     c.save();
     c.rotate(this.aim);
-    c.fillStyle = "#20261b";
-    const gunLen = this.tier >= 3 ? 26 : 21;
-    c.fillRect(4, -3, gunLen, 6);
-    c.fillStyle = "#3a4430";
-    c.fillRect(4, -3, gunLen - 6, 2);
-    if (this.tier === 2) {
-      c.fillStyle = "#20261b";
-      c.fillRect(8, -5, 6, 10);
-    }
-    if (this.tier >= 4) {
-      c.fillStyle = "#2c3324";
-      c.fillRect(12, -6, 10, 12);
-    }
+    this.drawGun(c);
     c.restore();
 
     // body
@@ -2848,15 +2904,18 @@ export class Engine {
     // muzzle flash
     if (this.muzzleT > 0) {
       const a = this.muzzleT / 0.05;
+      const mDist = this.tier === 6 ? 34 : this.tier === 5 ? 30 : this.tier === 2 ? 29 : 26;
+      const fLen = this.tier === 6 ? 26 : this.tier === 2 || this.tier === 5 ? 20 : 14;
+      const fWid = this.tier === 2 || this.tier === 5 ? 8 : 5;
       c.save();
-      c.translate(Math.cos(this.aim) * 26, Math.sin(this.aim) * 26);
+      c.translate(Math.cos(this.aim) * mDist, Math.sin(this.aim) * mDist);
       c.rotate(this.aim);
       c.globalAlpha = a;
-      c.fillStyle = "#ffe9a8";
+      c.fillStyle = this.tier === 6 ? "#aee9ff" : "#ffe9a8";
       c.beginPath();
-      c.moveTo(0, -5);
-      c.lineTo(14, 0);
-      c.lineTo(0, 5);
+      c.moveTo(0, -fWid);
+      c.lineTo(fLen, 0);
+      c.lineTo(0, fWid);
       c.lineTo(3, 0);
       c.closePath();
       c.fill();
@@ -2884,24 +2943,208 @@ export class Engine {
     }
   }
 
+  private drawGun(c: CanvasRenderingContext2D) {
+    const dark = "#1c2217";
+    const mid = "#2b3322";
+    const lite = "#4a5638";
+    const metal = "#39424c";
+    const wood = "#5c4a26";
+    switch (this.tier) {
+      case 0: {
+        // M9 sidearm
+        c.fillStyle = dark;
+        c.fillRect(5, -2.5, 14, 5);
+        c.fillStyle = metal;
+        c.fillRect(19, -1.5, 5, 3);
+        c.fillStyle = lite;
+        c.fillRect(5, -2.5, 12, 1.4);
+        break;
+      }
+      case 1: {
+        // VECTOR SMG
+        c.fillStyle = dark;
+        c.fillRect(4, -3, 19, 6);
+        c.fillStyle = mid;
+        c.fillRect(11, 3, 4.5, 9);
+        c.fillStyle = dark;
+        c.fillRect(12, 4.5, 2.5, 6.5);
+        c.fillRect(17, 3, 3, 6);
+        c.fillStyle = metal;
+        c.fillRect(23, -1.5, 5, 3);
+        c.fillStyle = lite;
+        c.fillRect(5, -3, 16, 1.4);
+        break;
+      }
+      case 2: {
+        // RIOT SHOTGUN — twin barrels + wooden pump
+        c.fillStyle = dark;
+        c.fillRect(2, -2.8, 7, 5.6);
+        c.fillStyle = metal;
+        c.fillRect(5, -4.2, 24, 3.6);
+        c.fillRect(5, 0.6, 24, 3.6);
+        c.fillStyle = "#232a31";
+        c.fillRect(27, -4.2, 2.4, 3.6);
+        c.fillRect(27, 0.6, 2.4, 3.6);
+        c.fillStyle = wood;
+        c.fillRect(14, -2.4, 8, 4.8);
+        c.fillStyle = lite;
+        c.fillRect(5, -4.2, 22, 1.1);
+        break;
+      }
+      case 3: {
+        // AK-74 — curved mag, wood stock, front post
+        c.fillStyle = wood;
+        c.fillRect(-1, -2.2, 5, 4.4);
+        c.fillStyle = dark;
+        c.fillRect(3, -3, 19, 6);
+        c.save();
+        c.translate(11, 3);
+        c.rotate(0.42);
+        c.fillStyle = "#3a3122";
+        c.fillRect(-2.2, 0, 5, 9.5);
+        c.restore();
+        c.fillStyle = metal;
+        c.fillRect(22, -1.5, 9, 3);
+        c.fillRect(29, -3.6, 1.6, 2.2);
+        c.fillStyle = lite;
+        c.fillRect(4, -3, 16, 1.3);
+        break;
+      }
+      case 4: {
+        // M134 MINIGUN — spinning barrel cluster
+        c.fillStyle = "#232b1c";
+        c.fillRect(5, -5, 13, 10);
+        c.fillStyle = dark;
+        c.fillRect(7, -3.6, 9, 7.2);
+        const spin = this.time * 16;
+        for (let i = 0; i < 3; i++) {
+          const off = Math.sin(spin + i * 2.094) * 3.4;
+          c.fillStyle = metal;
+          c.fillRect(18, off - 1.1, 15, 2.2);
+          c.fillStyle = "#59646e";
+          c.fillRect(31, off - 1.1, 2.4, 2.2);
+        }
+        c.strokeStyle = "#161b12";
+        c.lineWidth = 1.6;
+        c.beginPath();
+        c.arc(33.5, 0, 3.4, 0, Math.PI * 2);
+        c.stroke();
+        break;
+      }
+      case 5: {
+        // M6 INCINERATOR — fuel tank, hose, nozzle, live pilot light
+        c.fillStyle = dark;
+        c.fillRect(5, -3.5, 21, 7);
+        c.fillStyle = "#7a4a2c";
+        c.fillRect(8, -10.5, 12, 5.6);
+        c.beginPath();
+        c.arc(8, -7.7, 2.8, Math.PI / 2, Math.PI * 1.5);
+        c.arc(20, -7.7, 2.8, -Math.PI / 2, Math.PI / 2);
+        c.fill();
+        c.strokeStyle = dark;
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.moveTo(12, -10.5);
+        c.lineTo(12, -4.9);
+        c.moveTo(16, -10.5);
+        c.lineTo(16, -4.9);
+        c.stroke();
+        c.strokeStyle = "#151a10";
+        c.lineWidth = 1.8;
+        c.beginPath();
+        c.moveTo(8, -7.5);
+        c.quadraticCurveTo(2, -6, 3, -2);
+        c.stroke();
+        c.fillStyle = metal;
+        c.beginPath();
+        c.moveTo(26, -5);
+        c.lineTo(31, 0);
+        c.lineTo(26, 5);
+        c.closePath();
+        c.fill();
+        // pilot light — always hungry
+        const fl = 2.4 + Math.sin(this.time * 19) * 1.1;
+        c.fillStyle = "rgba(255,139,61,0.85)";
+        c.beginPath();
+        c.moveTo(31, -2);
+        c.lineTo(31 + fl * 1.8, 0);
+        c.lineTo(31, 2);
+        c.closePath();
+        c.fill();
+        c.fillStyle = "#ffd166";
+        c.beginPath();
+        c.arc(31, 0, 1.4, 0, Math.PI * 2);
+        c.fill();
+        break;
+      }
+      default: {
+        // ARC-9 RAILGUN — twin rails + pulsing energy core
+        c.fillStyle = dark;
+        c.fillRect(-1, -2, 5, 4);
+        c.fillStyle = "#232b33";
+        c.fillRect(3, -2.6, 23, 5.2);
+        c.fillStyle = metal;
+        c.fillRect(24, -4.4, 11, 2.2);
+        c.fillRect(24, 2.2, 11, 2.2);
+        c.fillStyle = "#59646e";
+        c.fillRect(33, -4.4, 2.4, 2.2);
+        c.fillRect(33, 2.2, 2.4, 2.2);
+        // core
+        const pr = 3 + Math.sin(this.time * 9) * 0.9;
+        c.fillStyle = "rgba(124,231,255,0.22)";
+        c.beginPath();
+        c.arc(14, 0, pr + 4.5, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "#7ce7ff";
+        c.beginPath();
+        c.arc(14, 0, pr, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "#e8fbff";
+        c.beginPath();
+        c.arc(14, 0, pr * 0.45, 0, Math.PI * 2);
+        c.fill();
+        // capacitor cells
+        for (let i = 0; i < 3; i++) {
+          c.fillStyle = `rgba(124,231,255,${0.35 + 0.3 * Math.sin(this.time * 6 + i * 1.7)})`;
+          c.fillRect(5 + i * 4, -1.4, 2.2, 2.8);
+        }
+        break;
+      }
+    }
+  }
+
   private drawBullets(c: CanvasRenderingContext2D) {
     for (const b of this.bullets) {
       const lx = b.x - b.vx * 0.022;
       const ly = b.y - b.vy * 0.022;
-      const col = this.powerT > 0 ? "#ffb347" : "#ffe9a8";
-      c.strokeStyle = this.powerT > 0 ? "rgba(255,179,71,0.25)" : "rgba(255,233,168,0.22)";
-      c.lineWidth = 5;
-      c.beginPath();
-      c.moveTo(lx, ly);
-      c.lineTo(b.x, b.y);
-      c.stroke();
+      const col = this.powerT > 0 ? "#ffb347" : b.col;
+      const lw = b.w;
+      // glow pass
+      c.globalAlpha = 0.28;
       c.strokeStyle = col;
-      c.lineWidth = 2;
+      c.lineWidth = lw * 2.6;
       c.beginPath();
       c.moveTo(lx, ly);
       c.lineTo(b.x, b.y);
       c.stroke();
+      // core pass
+      c.globalAlpha = 1;
+      c.lineWidth = lw;
+      c.beginPath();
+      c.moveTo(lx, ly);
+      c.lineTo(b.x, b.y);
+      c.stroke();
+      // railgun tip flare
+      if (lw >= 4) {
+        c.globalAlpha = 0.85;
+        c.fillStyle = "#d8f7ff";
+        c.beginPath();
+        c.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
+        c.fill();
+        c.globalAlpha = 1;
+      }
     }
+    c.globalAlpha = 1;
   }
 
   private drawAcids(c: CanvasRenderingContext2D) {
