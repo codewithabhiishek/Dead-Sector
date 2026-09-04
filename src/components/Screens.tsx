@@ -1,424 +1,486 @@
 import { useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { DIFFS, type Engine } from "../game/engine";
-import type { Difficulty } from "../game/store";
 import { useSnap } from "./HUD";
-import { sfx } from "../game/audio";
+import type { Engine } from "../game/engine";
+import { DIFFS } from "../game/engine";
+import type { Difficulty } from "../game/store";
 
-/* --------------------------------- helpers --------------------------------- */
+export type ScreenProps = { engine: Engine | null };
 
-function SpeakerIcon({ muted, className = "w-4 h-4" }: { muted: boolean; className?: string }) {
+/* ------------------------------- inline icons ------------------------------- */
+
+function SkullIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M4 9v6h4l6 5V4L8 9H4Z" />
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2C7 2 3.5 5.7 3.5 10.4c0 2.7 1.3 4.7 3 6v3.1c0 .8.7 1.5 1.5 1.5h1v-2h1.5v2h3v-2H15v2h1c.8 0 1.5-.7 1.5-1.5v-3.1c1.7-1.3 3-3.3 3-6C20.5 5.7 17 2 12 2zM8.7 13.2a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6.6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM12 14l1.3 2.6h-2.6L12 14z" />
+    </svg>
+  );
+}
+
+function SoundIcon({ muted, className = "w-5 h-5" }: { muted: boolean; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M11 5 6 9H3v6h3l5 4V5z" fill="currentColor" stroke="none" />
       {muted ? (
-        <path d="m16.5 8.5 5 7m0-7-5 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+        <>
+          <line x1="16" y1="9" x2="22" y2="15" />
+          <line x1="22" y1="9" x2="16" y2="15" />
+        </>
       ) : (
-        <path d="M16 8a5 5 0 0 1 0 8M18.5 5.5a9 9 0 0 1 0 13" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+        <>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 6a9 9 0 0 1 0 12" />
+        </>
       )}
     </svg>
   );
 }
 
-function Drips() {
+function PlayIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg
-      className="absolute left-0 right-0 -bottom-5 h-8 w-full pointer-events-none"
-      viewBox="0 0 400 32"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      {[
-        [22, 26, 0],
-        [70, 14, 0.8],
-        [118, 30, 1.6],
-        [168, 12, 0.4],
-        [215, 22, 2.2],
-        [262, 16, 1.1],
-        [308, 28, 0.2],
-        [355, 13, 1.9],
-      ].map(([x, h, d], i) => (
-        <path
-          key={i}
-          className="drip-anim"
-          style={{ animationDelay: `${d}s` }}
-          d={`M${x - 4} 0 Q${x} ${h} ${x + 4} 0 Z`}
-          fill="#a51420"
-        />
-      ))}
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M7 4.5v15l13-7.5-13-7.5z" />
     </svg>
   );
 }
 
-function ThreatRow({ color, name, desc, threat, score }: { color: string; name: string; desc: string; threat: number; score: string }) {
+function CrosshairIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-toxic/10 last:border-0">
-      <span className="relative w-3 h-3 shrink-0">
-        <span className="absolute inset-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-bold text-[13px] text-bone tracking-wide">{name}</span>
-          <span className="text-[10px] font-bold text-bone/40 tabular-nums">+{score}</span>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-bone/50 truncate">{desc}</span>
-          <span className="flex gap-0.5 shrink-0">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <span key={i} className={`w-1 h-2.5 skew-x-[-12deg] ${i < threat ? "bg-blood" : "bg-bone/15"}`} />
-            ))}
-          </span>
-        </div>
-      </div>
-    </div>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="7" />
+      <line x1="12" y1="2" x2="12" y2="6" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+      <line x1="2" y1="12" x2="6" y2="12" />
+      <line x1="18" y1="12" x2="22" y2="12" />
+    </svg>
   );
 }
 
-function ControlsRow({ keys, label }: { keys: string[]; label: string }) {
+function TargetIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="flex gap-1 flex-wrap">
-        {keys.map((k) => (
-          <kbd key={k} className="keycap chamfer-sm">
-            {k}
-          </kbd>
-        ))}
-      </span>
-      <span className="text-[12px] text-bone/60 font-semibold">{label}</span>
-    </div>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.5" />
+      <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+    </svg>
   );
 }
 
-/* ---------------------------------- banner ---------------------------------- */
+/* ------------------------------ shared bits ------------------------------ */
 
-export function Banner() {
-  const s = useSnap();
-  if (!s.banner || (s.phase !== "playing" && s.phase !== "paused")) return null;
-  const tone =
-    s.banner.tone === "blood"
-      ? "text-blood"
-      : s.banner.tone === "bone"
-        ? "text-bone"
-        : "text-acid";
-  const glow =
-    s.banner.tone === "blood"
-      ? "0 0 40px rgba(229,34,46,0.6)"
-      : s.banner.tone === "bone"
-        ? "0 0 40px rgba(232,224,200,0.4)"
-        : "0 0 40px rgba(163,245,46,0.55)";
+function ThreatPips({ level }: { level: number }) {
   return (
-    <div className="absolute top-[22%] inset-x-0 z-30 flex flex-col items-center pointer-events-none">
-      <div key={s.banner.key} className="banner-anim text-center">
-        <div className={`font-display text-6xl md:text-7xl ${tone}`} style={{ textShadow: glow }}>
-          {s.banner.text}
-        </div>
-        <div className="stencil text-sm text-bone/70 mt-2">{s.banner.sub}</div>
-      </div>
-    </div>
+    <span className="flex items-end gap-[3px]" aria-label={`threat level ${level} of 5`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className="w-[4px] rounded-[1px]"
+          style={{
+            height: `${5 + i * 2}px`,
+            background: i <= level ? (level >= 4 ? "#e5222e" : level === 3 ? "#ffb347" : "#a3f52e") : "rgba(232,224,200,0.14)",
+            boxShadow: i <= level && level >= 4 ? "0 0 5px rgba(229,34,46,0.7)" : "none",
+          }}
+        />
+      ))}
+    </span>
   );
 }
 
-/* ---------------------------------- screens ---------------------------------- */
-
-interface ScreenProps {
-  engine: Engine | null;
-}
+/* ------------------------------- menu screen ------------------------------- */
 
 export function MenuScreen({ engine }: ScreenProps) {
   const s = useSnap();
   if (s.phase !== "menu") return null;
+
+  const controls: { label: string; keys: string[]; desc: string }[] = [
+    { label: "Move", keys: ["W", "A", "S", "D"], desc: "Run the sector" },
+    { label: "Sprint", keys: ["SHIFT"], desc: "Burns stamina" },
+    { label: "Aim · Fire", keys: ["MOUSE", "LMB"], desc: "Hold for full-auto" },
+    { label: "Combat Dash", keys: ["SPACE"], desc: "Brief invulnerability" },
+    { label: "Reload", keys: ["R"], desc: "Or auto when dry" },
+    { label: "Pause", keys: ["P"], desc: "Esc also works" },
+  ];
+
+  const threats: { name: string; color: string; blurb: string; score: number; threat: number; icon: React.ReactNode }[] = [
+    { name: "WALKER", color: "#8fb05e", blurb: "Slow · relentless · swarms in numbers", score: 10, threat: 1, icon: <SkullIcon className="w-4 h-4" /> },
+    { name: "RUNNER", color: "#e8a33d", blurb: "Fast flanker — closes distance quick", score: 15, threat: 2, icon: <SkullIcon className="w-4 h-4" /> },
+    { name: "SPITTER", color: "#cdeb45", blurb: "Lobs corrosive acid from range", score: 25, threat: 3, icon: <SkullIcon className="w-4 h-4" /> },
+    { name: "BRUTE", color: "#d97b7b", blurb: "Armored — heavy hits, hard to drop", score: 60, threat: 4, icon: <SkullIcon className="w-4 h-4" /> },
+    { name: "ABOMINATION", color: "#ff5257", blurb: "Boss · plasma volley · every 5th wave", score: 500, threat: 5, icon: <SkullIcon className="w-5 h-5" /> },
+  ];
+
   return (
-    <div className="absolute inset-0 z-40 font-ui overflow-y-auto" style={{ background: "radial-gradient(ellipse at 50% 38%, rgba(6,10,7,0.55) 0%, rgba(4,7,5,0.93) 78%)" }}>
-      <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
-        <div className="rise-in text-center">
-          <div className="stencil text-[11px] text-blood tracking-[0.4em] mb-3">
-            ⚠ Sector 9 // Quarantine Protocol 7-Δ
-          </div>
-          <h1 className="relative inline-block font-display text-7xl md:text-8xl text-toxic title-flicker leading-none">
-            DEAD SECTOR
-            <Drips />
-          </h1>
-          <p className="mt-7 text-[13px] md:text-sm text-bone/60 max-w-md mx-auto font-medium tracking-wide">
-            The wire is breached. Run the open sector, use the wrecks for cover,
-            and out-gun the horde — <span className="text-acid font-bold">every wave is worse than the last.</span>
-          </p>
+    <div className="absolute inset-0 z-20 overflow-y-auto overflow-x-hidden">
+      {/* readability scrim behind the header */}
+      <div className="title-scrim absolute inset-x-0 top-0 h-[52vh] pointer-events-none" />
+
+      <div className="relative min-h-full flex flex-col items-center px-4 sm:px-8 py-7 sm:py-10">
+        {/* quarantine bar */}
+        <div className="hazard-stripe h-[3px] w-full max-w-[560px] opacity-70 rise-in" />
+
+        {/* classification strip */}
+        <div className="mt-4 flex items-center gap-2.5 rise-in">
+          <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
+          <span className="stencil text-[9px] sm:text-[10px] text-blood/90">
+            Classified · Biohazard Level 4 · Eyes Only
+          </span>
+          <span className="w-1.5 h-1.5 bg-blood blink-lamp shadow-[0_0_8px_#e5222e]" />
         </div>
 
-        <div className="rise-in rise-in-1 mt-8 flex flex-col items-center">
-          <div className="stencil text-[9px] text-bone/40 mb-2">Select difficulty</div>
-          <div className="flex gap-2">
+        {/* title */}
+        <h1 className="title-flicker font-display text-toxic leading-none mt-4 text-center text-[clamp(3.2rem,10.5vw,7rem)] rise-in rise-in-1">
+          DEAD SECTOR
+        </h1>
+        <div className="mt-2.5 flex items-center gap-3 rise-in rise-in-1">
+          <span className="h-px w-10 sm:w-16 bg-toxic/40" />
+          <span className="stencil text-[10px] sm:text-[11px] text-bone/70">Sector 9 · Quarantine Protocol</span>
+          <span className="h-px w-10 sm:w-16 bg-toxic/40" />
+        </div>
+        <p className="mt-5 max-w-md text-center text-[13px] sm:text-sm text-bone/65 font-medium tracking-wide leading-relaxed rise-in rise-in-2">
+          The wire is breached. Run the open sector, use the wrecks for cover, and out-gun the
+          horde — <span className="text-acid font-bold">survive all 10 waves.</span>
+        </p>
+
+        {/* difficulty selector */}
+        <section className="mt-8 w-full max-w-[432px] rise-in rise-in-2" aria-label="Difficulty selection">
+          <div className="flex items-center justify-between mb-2 px-0.5">
+            <span className="stencil text-[9px] text-bone/45">Select Difficulty</span>
+            <span className="stencil text-[9px] text-bone/30">03 Protocols</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             {(["recruit", "veteran", "nightmare"] as Difficulty[]).map((k) => {
               const active = s.difficulty === k;
-              const cls = !active
-                ? "btn-ghost opacity-70"
-                : k === "nightmare"
-                  ? "btn-danger"
-                  : k === "recruit"
-                    ? "btn-ghost"
-                    : "btn-primary";
               return (
                 <button
                   key={k}
                   onClick={() => engine?.setDifficulty(k)}
-                  className={`chamfer-sm px-5 py-2.5 text-[12px] transition-all duration-150 ${cls}`}
-                  style={
-                    active && k === "recruit"
-                      ? { color: "#e8e0c8", borderColor: "rgba(232,224,200,0.8)", boxShadow: "0 0 18px rgba(232,224,200,0.25)" }
-                      : undefined
-                  }
+                  data-active={active}
+                  className={`btn-diff ${k === "nightmare" ? "danger" : ""}`}
+                  aria-pressed={active}
                 >
-                  {DIFFS[k].label}
+                  <span className="flex items-center gap-1.5">
+                    <span className="diff-dot" />
+                    {DIFFS[k].label}
+                  </span>
+                  <span className="diff-sub">Score ×{DIFFS[k].score}</span>
                 </button>
               );
             })}
           </div>
-          <div className="stencil text-[9px] text-bone/45 mt-2">{DIFFS[s.difficulty].blurb}</div>
-        </div>
+          <p className="mt-2.5 text-center stencil text-[9px] text-bone/50">{DIFFS[s.difficulty].blurb}</p>
+        </section>
 
-        <div className="rise-in rise-in-2 mt-5 flex items-center gap-3">
-          <button
-            onClick={() => engine?.start()}
-            className="btn-primary chamfer px-10 py-4 text-lg"
-          >
-            ▸ Deploy
+        {/* deploy + sound — aligned row */}
+        <div className="mt-5 w-full max-w-[432px] grid grid-cols-[1fr_56px] gap-2 rise-in rise-in-3">
+          <button onClick={() => engine?.start()} className="btn-deploy h-[56px] text-[15px] sm:text-base">
+            Deploy
+            <PlayIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => engine?.toggleMute()}
-            className="btn-ghost chamfer-sm p-4"
-            title="Toggle sound (M)"
+            className="btn-ghost h-[56px]"
+            aria-label={s.muted ? "Unmute" : "Mute"}
+            title="Toggle audio (M)"
           >
-            <SpeakerIcon muted={s.muted} />
+            <SoundIcon muted={s.muted} />
           </button>
         </div>
-        <div className="rise-in rise-in-1 stencil text-[9px] text-bone/35 mt-2">Enter — deploy · M — sound</div>
+        <div className="mt-3 stencil text-[9px] text-bone/35 tabular-nums rise-in rise-in-3">
+          Best {s.best.toLocaleString()} pts · Wave {s.bestWave} · {s.muted ? "Audio off" : "Audio on"} (M)
+        </div>
 
-        <div className="rise-in rise-in-2 mt-8 grid md:grid-cols-2 gap-3 w-full max-w-2xl">
-          <div className="hud-panel chamfer p-5">
-            <div className="stencil text-[10px] text-toxic/80 mb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-toxic inline-block" /> Field Manual
-            </div>
-            <ControlsRow keys={["W", "A", "S", "D"]} label="Move through the sector" />
-            <ControlsRow keys={["SHIFT"]} label="Sprint (drains stamina)" />
-            <ControlsRow keys={["MOUSE"]} label="Aim · hold LMB to fire" />
-            <ControlsRow keys={["SPACE"]} label="Combat dash (i-frames)" />
-            <ControlsRow keys={["R"]} label="Reload" />
-            <ControlsRow keys={["P"]} label="Pause" />
-            <p className="text-[11px] text-bone/45 mt-3 leading-relaxed">
-              Weapons upgrade automatically at <span className="text-acid font-bold">12 / 35 / 75 / 140</span> kills.
-              Chain kills within 2.2s to build a <span className="text-ember font-bold">×5 score combo</span>.
+        {/* intel panels — identical geometry */}
+        <div className="mt-9 w-full max-w-[880px] grid gap-3 md:grid-cols-2 items-stretch rise-in rise-in-4">
+          <section className="panel p-4 sm:p-5">
+            <header className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TargetIcon className="w-4 h-4 text-toxic/80" />
+                <h2 className="stencil text-[11px] text-bone">Field Manual</h2>
+              </div>
+              <span className="stencil text-[8px] text-bone/30">Ref 7-A</span>
+            </header>
+            <ul className="space-y-2.5">
+              {controls.map((c) => (
+                <li key={c.label} className="flex items-center justify-between gap-3 py-0.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex gap-1 shrink-0">
+                      {c.keys.map((k) => (
+                        <kbd key={k} className="keycap">
+                          {k}
+                        </kbd>
+                      ))}
+                    </span>
+                    <span className="stencil text-[10px] text-bone/85 whitespace-nowrap">{c.label}</span>
+                  </div>
+                  <span className="text-[11px] text-bone/40 text-right truncate">{c.desc}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 pt-3 border-t border-bone/10 text-[10px] text-bone/35 leading-relaxed">
+              Tip: chain kills within 2.2s for a ×5 combo · sprinting widens your spread · cover
+              blocks bullets but not acid.
             </p>
-          </div>
-          <div className="hud-panel chamfer p-5">
-            <div className="stencil text-[10px] text-toxic/80 mb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-blood inline-block" /> Threat Intel
-            </div>
-            <ThreatRow color="#5d8f3a" name="WALKER" desc="Slow. Relentless. Bites in packs." threat={1} score="10" />
-            <ThreatRow color="#b3502e" name="RUNNER" desc="Fast twitch muscle — flanks you." threat={2} score="15" />
-            <ThreatRow color="#8fb32e" name="SPITTER" desc="Keeps range, lobs acid." threat={3} score="25" />
-            <ThreatRow color="#6e3b4a" name="BRUTE" desc="Armored slab. Hits like a truck." threat={4} score="60" />
-            <ThreatRow color="#7a1f2b" name="ABOMINATION" desc="Appears every 5th wave. Pray." threat={5} score="500" />
-          </div>
+          </section>
+
+          <section className="panel panel-red p-4 sm:p-5">
+            <header className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <SkullIcon className="w-4 h-4 text-blood/90" />
+                <h2 className="stencil text-[11px] text-bone">Threat Intel</h2>
+              </div>
+              <span className="stencil text-[8px] text-bone/30">Intel 09</span>
+            </header>
+            <ul className="space-y-2">
+              {threats.map((t) => (
+                <li key={t.name} className="flex items-center gap-3 py-0.5">
+                  <span
+                    className="w-9 h-9 shrink-0 grid place-items-center border bg-black/30 rounded-[3px]"
+                    style={{ borderColor: `${t.color}44`, color: t.color }}
+                  >
+                    {t.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] font-bold tracking-wider" style={{ color: t.color }}>
+                        {t.name}
+                      </span>
+                      <ThreatPips level={t.threat} />
+                    </div>
+                    <div className="text-[10px] text-bone/40 truncate">{t.blurb}</div>
+                  </div>
+                  <span className="stencil text-[9px] text-ember/80 tabular-nums shrink-0">+{t.score}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 pt-3 border-t border-bone/10 text-[10px] text-bone/35 leading-relaxed">
+              Waves 5–7 escalate sharply · Wave 10: the Patriarch. Clear all ten to enter Overtime.
+            </p>
+          </section>
         </div>
 
-        <div className="rise-in rise-in-3 mt-4 flex items-center gap-6 hud-panel chamfer-sm px-6 py-3">
-          <div className="text-center">
-            <div className="stencil text-[9px] text-bone/40">Best Score</div>
-            <div className="font-extrabold text-xl text-acid tabular-nums">{s.best.toLocaleString()}</div>
-          </div>
-          <div className="w-px h-8 bg-toxic/15" />
-          <div className="text-center">
-            <div className="stencil text-[9px] text-bone/40">Best Wave</div>
-            <div className="font-extrabold text-xl text-bone tabular-nums">{s.bestWave}</div>
-          </div>
-          <div className="w-px h-8 bg-toxic/15" />
-          <div className="text-center max-w-[190px]">
-            <div className="stencil text-[9px] text-bone/40">Supply Drops</div>
-            <div className="text-[11px] text-bone/60 font-semibold">Medkits · Frenzy · Hollow-points · Shields · Nukes</div>
-          </div>
-        </div>
+        {/* footer */}
+        <footer className="mt-8 mb-1 flex flex-col items-center gap-2 rise-in rise-in-4">
+          <div className="hazard-stripe h-[3px] w-full max-w-[560px] opacity-40" />
+          <span className="stencil text-[8px] text-bone/25">
+            Build 2.7 · Containment net uplink stable · Sector 9
+          </span>
+        </footer>
       </div>
     </div>
   );
 }
+
+/* ------------------------------ pause screen ------------------------------ */
 
 export function PauseScreen({ engine }: ScreenProps) {
   const s = useSnap();
   if (s.phase !== "paused") return null;
   return (
-    <div className="absolute inset-0 z-40 font-ui flex items-center justify-center" style={{ background: "rgba(3,6,4,0.82)" }}>
-      <div className="hud-panel chamfer p-8 w-[min(420px,92vw)] rise-in">
-        <div className="stencil text-[10px] text-toxic/70 mb-1">Operation suspended</div>
-        <h2 className="font-display text-5xl text-bone leading-none mb-6">PAUSED</h2>
-        <div className="flex flex-col gap-2.5">
-          <button onClick={() => engine?.resume()} className="btn-primary chamfer-sm px-6 py-3">
-            ▸ Resume
-          </button>
-          <button onClick={() => engine?.start()} className="btn-ghost chamfer-sm px-6 py-3">
-            Restart Run
-          </button>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={() => engine?.toMenu()} className="btn-ghost chamfer-sm px-4 py-3 text-[12px]">
-              Abandon
-            </button>
-            <button onClick={() => engine?.toggleMute()} className="btn-ghost chamfer-sm px-4 py-3 text-[12px] flex items-center justify-center gap-2">
-              <SpeakerIcon muted={s.muted} /> {s.muted ? "Unmute" : "Mute"}
-            </button>
-          </div>
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[2px] px-4">
+      <div className="panel p-6 sm:p-8 w-full max-w-sm text-center">
+        <div className="stencil text-[9px] text-ember/80 mb-2">Operation suspended</div>
+        <h2 className="font-display text-5xl text-bone leading-none">PAUSED</h2>
+        <div className="mt-3 stencil text-[9px] text-bone/40">
+          {DIFFS[s.difficulty].label} protocol · Wave {s.wave} · {s.kills} kills
         </div>
-        <div className="mt-5 pt-4 border-t border-toxic/10 text-[11px] text-bone/45 leading-relaxed">
-          <kbd className="keycap chamfer-sm mr-1.5">P</kbd>/<kbd className="keycap chamfer-sm mx-1.5">ESC</kbd> resume ·{" "}
-          <kbd className="keycap chamfer-sm mx-1.5">SPACE</kbd> dash · <kbd className="keycap chamfer-sm ml-1.5">R</kbd> reload
+        <div className="mt-6 flex flex-col gap-2.5">
+          <button onClick={() => engine?.resume()} className="btn-primary py-3.5 text-sm">
+            <PlayIcon /> Resume
+          </button>
+          <button onClick={() => engine?.start()} className="btn-ghost py-3 text-[12px]">
+            Restart run
+          </button>
+          <button onClick={() => engine?.toMenu()} className="btn-danger py-3 text-[12px]">
+            Abandon mission
+          </button>
         </div>
+        <div className="mt-5 stencil text-[9px] text-bone/35">P / Esc to resume · M to mute</div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="bg-black/30 chamfer-sm px-4 py-3 border border-toxic/10">
-      <div className="stencil text-[9px] text-bone/40">{label}</div>
-      <div className={`font-extrabold text-xl tabular-nums ${accent ? "text-acid" : "text-bone"}`}>{value}</div>
-    </div>
-  );
+/* ---------------------------- game over screen ---------------------------- */
+
+function fmtClock(t: number) {
+  const m = Math.floor(t / 60);
+  const ss = Math.floor(t % 60);
+  return `${m}:${ss.toString().padStart(2, "0")}`;
 }
 
 export function GameOverScreen({ engine }: ScreenProps) {
   const s = useSnap();
-  if (s.phase !== "gameover" || !s.stats) return null;
-  const st = s.stats;
-  const mm = Math.floor(st.time / 60);
-  const ss = Math.floor(st.time % 60).toString().padStart(2, "0");
+  if (s.phase !== "gameover") return null;
+  const acc = Math.round((s.stats?.accuracy ?? 0) * 100);
+  const newBest = s.stats?.newBest ?? false;
+  const stats: { label: string; value: string }[] = [
+    { label: "Final score", value: s.score.toLocaleString() },
+    { label: "Waves held", value: `${s.wave}` },
+    { label: "Kills", value: `${s.kills}` },
+    { label: "Best combo", value: `×${s.stats?.maxCombo ?? 0}` },
+    { label: "Accuracy", value: `${acc}%` },
+    { label: "Survived", value: fmtClock(s.time) },
+  ];
   return (
-    <div className="absolute inset-0 z-40 font-ui flex items-center justify-center" style={{ background: "radial-gradient(ellipse at center, rgba(60,5,9,0.55) 0%, rgba(5,3,3,0.94) 75%)" }}>
-      <div className="w-[min(480px,94vw)] text-center">
-        <div className="rise-in stencil text-[10px] text-blood tracking-[0.4em] mb-2">Vitals flatlined</div>
-        <h2 className="rise-in font-display text-8xl text-blood leading-none" style={{ textShadow: "0 0 50px rgba(229,34,46,0.55), 0 5px 0 #2a0508" }}>
-          OVERRUN
-        </h2>
-        {st.newBest && (
-          <div className="rise-in rise-in-1 inline-block mt-4 stencil text-[11px] text-black bg-acid px-4 py-1.5 chamfer-sm" style={{ boxShadow: "0 0 24px rgba(212,255,77,0.5)" }}>
-            ★ New record — {st.best.toLocaleString()}
+    <div className="absolute inset-0 z-30 flex items-center justify-center px-4" style={{ background: "rgba(18,4,6,0.72)" }}>
+      <div className="relative w-full max-w-md">
+        {/* dripping blood header */}
+        <svg className="absolute -top-1 left-1/2 -translate-x-1/2 w-[320px] max-w-full text-[#8f1219] drip-anim" viewBox="0 0 320 46" fill="currentColor" aria-hidden>
+          <path d="M0 0h320v10c-14 3-20 14-30 14s-12-9-26-9-16 16-30 16-14-12-28-12-12 8-26 8-18-14-32-14-12 10-26 10-16-13-30-13-10 7-24 7-18-11-32-11-10 6-22 6S8 6 0 8V0z" />
+        </svg>
+        <div className="panel panel-red p-6 sm:p-8 text-center">
+          <div className="stencil text-[9px] text-blood/80 mb-2">Containment failed</div>
+          <h2 className="font-display text-6xl sm:text-7xl text-blood leading-none" style={{ textShadow: "0 0 36px rgba(229,34,46,0.5), 0 4px 0 #3a060b" }}>
+            OVERRUN
+          </h2>
+          <div className="mt-2 stencil text-[10px] text-bone/50">The horde has taken the sector</div>
+
+          {newBest && (
+            <div className="mt-4 inline-block border border-acid/60 bg-acid/10 px-4 py-1.5 stencil text-[10px] text-acid shadow-[0_0_18px_rgba(212,255,77,0.25)]">
+              ★ New personal best
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-px bg-bone/10 border border-bone/10">
+            {stats.map((st) => (
+              <div key={st.label} className="bg-[#0d0a0a] px-2 py-3">
+                <div className="stencil text-[8px] text-bone/40">{st.label}</div>
+                <div className="mt-1 text-lg font-extrabold text-bone tabular-nums leading-none">{st.value}</div>
+              </div>
+            ))}
           </div>
-        )}
-        <div className="rise-in rise-in-1 hud-panel chamfer p-5 mt-5">
-          <div className="flex items-baseline justify-center gap-2 mb-4">
-            <span className="font-extrabold text-5xl text-acid tabular-nums">{st.score.toLocaleString()}</span>
-            <span className="stencil text-[10px] text-bone/40">pts</span>
+
+          <div className="mt-3 stencil text-[9px] text-bone/35 tabular-nums">
+            Personal best · {s.best.toLocaleString()} pts · Wave {s.bestWave}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Wave Reached" value={String(st.wave)} />
-            <Stat label="Kills" value={st.kills.toLocaleString()} />
-            <Stat label="Best Combo" value={`×${(1 + Math.min(st.maxCombo, 40) * 0.1).toFixed(1)} (${st.maxCombo})`} />
-            <Stat label="Accuracy" value={`${Math.round(st.accuracy * 100)}%`} />
-            <Stat label="Time Survived" value={`${mm}:${ss}`} />
-            <Stat label="Best Score" value={st.best.toLocaleString()} accent />
+
+          <div className="mt-6 grid grid-cols-[1fr_auto] gap-2">
+            <button onClick={() => engine?.start()} className="btn-primary py-3.5 text-sm">
+              <CrosshairIcon /> Redeploy
+            </button>
+            <button onClick={() => engine?.toMenu()} className="btn-ghost px-5 text-[12px]">
+              Menu
+            </button>
           </div>
+          <div className="mt-4 stencil text-[9px] text-bone/30">Press Enter to redeploy</div>
         </div>
-        <div className="rise-in rise-in-2 mt-5 flex items-center justify-center gap-3">
-          <button onClick={() => engine?.start()} className="btn-danger chamfer px-8 py-3.5">
-            ▸ Re-deploy
-          </button>
-          <button onClick={() => engine?.toMenu()} className="btn-ghost chamfer-sm px-6 py-3.5">
-            Menu
-          </button>
-        </div>
-        <div className="rise-in rise-in-3 stencil text-[9px] text-bone/35 mt-3">Enter — instant retry</div>
       </div>
     </div>
   );
 }
 
-/* -------------------------------- touch UI -------------------------------- */
+/* ------------------------------ wave banner ------------------------------ */
+
+export function Banner() {
+  const s = useSnap();
+  const b = s.banner;
+  if (!b) return null;
+  const col = b.tone === "blood" ? "text-blood" : b.tone === "bone" ? "text-bone" : "text-toxic";
+  const glow =
+    b.tone === "blood"
+      ? "0 0 40px rgba(229,34,46,0.55), 0 4px 0 #3a060b"
+      : b.tone === "bone"
+        ? "0 0 30px rgba(232,224,200,0.35), 0 4px 0 #2a2820"
+        : "0 0 40px rgba(163,245,46,0.5), 0 4px 0 #123307";
+  return (
+    <div key={b.key} className="absolute inset-x-0 top-[22%] z-20 flex flex-col items-center pointer-events-none px-4">
+      <div className={`banner-anim font-display text-5xl sm:text-6xl md:text-7xl ${col} text-center leading-none`} style={{ textShadow: glow }}>
+        {b.text}
+      </div>
+      <div className="banner-anim mt-2 stencil text-[10px] sm:text-[11px] text-bone/80 bg-black/50 border border-bone/15 px-4 py-1.5 rounded-[3px] text-center">
+        {b.sub}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- touch controls ---------------------------- */
 
 export function TouchControls({ engine }: ScreenProps) {
   const s = useSnap();
   const [joy, setJoy] = useState<{ ox: number; oy: number; dx: number; dy: number } | null>(null);
   const [sprintOn, setSprintOn] = useState(false);
   const zoneRef = useRef<HTMLDivElement>(null);
-  if (!engine?.isTouch || (s.phase !== "playing" && s.phase !== "paused")) return null;
 
-  const MAX = 48;
+  if (s.phase !== "playing" || !engine?.isTouch) return null;
+
+  const R = 52;
 
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
-    sfx.unlock();
-    zoneRef.current?.setPointerCapture(e.pointerId);
-    setJoy({ ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 });
-    engine.setTouchMove(0, 0, true);
+    const rect = zoneRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setJoy({ ox: e.clientX - rect.left, oy: e.clientY - rect.top, dx: 0, dy: 0 });
   };
   const onMove = (e: RPointerEvent<HTMLDivElement>) => {
     if (!joy) return;
-    let dx = e.clientX - joy.ox;
-    let dy = e.clientY - joy.oy;
+    const rect = zoneRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    let dx = e.clientX - rect.left - joy.ox;
+    let dy = e.clientY - rect.top - joy.oy;
     const l = Math.hypot(dx, dy);
-    if (l > MAX) {
-      dx = (dx / l) * MAX;
-      dy = (dy / l) * MAX;
+    if (l > R) {
+      dx = (dx / l) * R;
+      dy = (dy / l) * R;
     }
     setJoy({ ...joy, dx, dy });
-    engine.setTouchMove(dx / MAX, dy / MAX, true);
+    engine.setTouchMove(dx / R, dy / R, true);
   };
   const onUp = () => {
     setJoy(null);
-    engine.setTouchMove(0, 0, false);
+    engine?.setTouchMove(0, 0, false);
   };
 
   return (
-    <div className="absolute inset-0 z-30 pointer-events-none">
+    <div className="absolute inset-0 z-20 pointer-events-none select-none">
+      {/* pause — top right (minimap is disabled on touch, so the corner is clear) */}
+      <button
+        className="absolute top-4 right-4 btn-ghost px-4 py-2 text-[11px] pointer-events-auto rounded-[3px]"
+        onPointerDown={() => engine?.pause()}
+      >
+        ❚❚ Pause
+      </button>
+
+      {/* movement joystick */}
       <div
         ref={zoneRef}
-        className="absolute left-0 bottom-0 w-1/2 h-[62%] pointer-events-auto"
-        style={{ touchAction: "none" }}
+        className="absolute left-5 bottom-8 w-40 h-40 pointer-events-auto touch-none"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
       >
-        {joy ? (
-          <div className="absolute" style={{ left: joy.ox - 56, top: joy.oy - 56, width: 112, height: 112 }}>
-            <div className="absolute inset-0 rounded-full border-2 border-toxic/40 bg-toxic/5" />
-            <div
-              className="absolute rounded-full bg-toxic/60"
-              style={{ left: 56 - 20 + joy.dx, top: 56 - 20 + joy.dy, width: 40, height: 40 }}
-            />
-          </div>
-        ) : (
-          <div className="absolute left-8 bottom-24 w-24 h-24 rounded-full border-2 border-toxic/25 flex items-center justify-center">
-            <span className="stencil text-[9px] text-toxic/50">Move</span>
-          </div>
-        )}
+        <div className="absolute left-2 top-2 w-36 h-36 rounded-full border-2 border-toxic/25 bg-black/30" />
+        <div
+          className="absolute w-16 h-16 rounded-full border-2 border-toxic/60 bg-toxic/20"
+          style={{
+            left: joy ? joy.ox + joy.dx - 32 : 40,
+            top: joy ? joy.oy + joy.dy - 32 : 40,
+            transition: joy ? "none" : "all 0.15s ease",
+          }}
+        />
       </div>
-      <button
-        className="absolute top-24 left-1/2 -translate-x-1/2 btn-ghost chamfer-sm px-4 py-2 text-[11px] pointer-events-auto"
-        onPointerDown={() => engine.pause()}
-      >
-        ❚❚ Pause
-      </button>
-      <div className="absolute right-6 bottom-20 flex flex-col items-end gap-4 pointer-events-auto" style={{ touchAction: "none" }}>
-        <button
-          className="btn-ghost chamfer-sm px-5 py-3 text-[12px]"
-          onPointerDown={() => engine.dashAction()}
-        >
+
+      {/* action cluster */}
+      <div className="absolute right-5 bottom-20 flex flex-col items-end gap-3 pointer-events-auto" style={{ touchAction: "none" }}>
+        <button className="btn-ghost px-5 py-3 text-[12px] rounded-[3px]" onPointerDown={() => engine?.dashAction()}>
           Dash
         </button>
         <button
-          className={`chamfer-sm px-5 py-3 text-[12px] ${sprintOn ? "btn-primary" : "btn-ghost"}`}
+          className={`px-5 py-3 text-[12px] rounded-[3px] ${sprintOn ? "btn-primary" : "btn-ghost"}`}
           onPointerDown={() => {
             const next = !sprintOn;
             setSprintOn(next);
-            engine.setTouchSprint(next);
+            engine?.setTouchSprint(next);
           }}
         >
           {sprintOn ? "Sprint ●" : "Sprint"}
         </button>
         <button
-          className="btn-primary chamfer w-24 h-24 rounded-full! text-sm"
-          onPointerDown={() => {
-            sfx.unlock();
-            engine.setTouchFire(true);
-          }}
-          onPointerUp={() => engine.setTouchFire(false)}
-          onPointerCancel={() => engine.setTouchFire(false)}
-          onPointerLeave={() => engine.setTouchFire(false)}
+          className="w-20 h-20 rounded-full btn-primary text-[12px] border-2"
+          onPointerDown={() => engine?.setTouchFire(true)}
+          onPointerUp={() => engine?.setTouchFire(false)}
+          onPointerCancel={() => engine?.setTouchFire(false)}
+          onPointerLeave={() => engine?.setTouchFire(false)}
         >
           Fire
         </button>

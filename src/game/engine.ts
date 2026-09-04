@@ -3140,6 +3140,7 @@ export class Engine {
   }
 
   private drawMinimap(c: CanvasRenderingContext2D) {
+    if (this.isTouch) return; // touch layout uses the pause button + edge markers instead
     if (this.w < 680) return; // too narrow — would overlap the vitals panel
     const mw = 178;
     const mh = Math.round((mw * WORLD_H) / WORLD_W);
