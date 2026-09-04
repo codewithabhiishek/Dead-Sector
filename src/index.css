@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Creepster", cursive;
-  --font-ui: "Oxanium", monospace;
+  --font-display: "Creepster", Impact, "Haettenschweiler", "Arial Narrow Bold", sans-serif;
+  --font-ui: "Oxanium", "Bahnschrift", "Segoe UI", ui-monospace, monospace;
   --color-toxic: #a3f52e;
   --color-toxic-dim: #5c8f1e;
   --color-toxic-dark: #1c2b10;
