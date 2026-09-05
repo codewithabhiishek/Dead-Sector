@@ -302,6 +302,26 @@ function BossBar({ s }: { s: Snapshot }) {
   );
 }
 
+function AutoAimToggle({ s, engine, compact = false }: { s: Snapshot; engine?: Engine | null; compact?: boolean }) {
+  return (
+    <button
+      onClick={() => engine?.toggleAutoAim()}
+      className={`pointer-events-auto flex items-center gap-1.5 border rounded-[3px] font-mono transition-all ${
+        compact ? "px-2 py-1 text-[8.5px]" : "px-2.5 py-1.5 text-[9.5px]"
+      } ${
+        s.autoAim
+          ? "border-toxic/70 bg-toxic/20 text-toxic shadow-[0_0_10px_rgba(163,245,46,0.35)]"
+          : "border-bone/25 bg-black/50 text-bone/50 hover:text-bone hover:border-bone/40"
+      }`}
+      title="Toggle auto-targeting and shooting (Shortcut: Z or T)"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${s.autoAim ? "bg-toxic animate-pulse" : "bg-bone/40"}`} />
+      <span className="font-bold">{s.autoAim ? "AUTO-FIRE ON" : "AUTO-FIRE OFF"}</span>
+      {!compact && <span className="text-[8px] opacity-65">[Z]</span>}
+    </button>
+  );
+}
+
 export default function HUD({ engine }: { engine?: Engine | null }) {
   const s = useSnap();
   if (s.phase !== "playing" && s.phase !== "paused") return null;
@@ -324,8 +344,9 @@ export default function HUD({ engine }: { engine?: Engine | null }) {
             <ScorePanel s={s} compact />
           </div>
 
-          {/* Top Right: Compact Weapon docked next to Pause button */}
+          {/* Top Right: Auto-fire toggle + Compact Weapon docked next to Pause button */}
           <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] right-[max(4.5rem,calc(env(safe-area-inset-right)+3.8rem))] flex flex-col items-end gap-1">
+            <AutoAimToggle s={s} engine={engine} compact />
             <WeaponPanel s={s} compact />
           </div>
         </>
@@ -336,6 +357,35 @@ export default function HUD({ engine }: { engine?: Engine | null }) {
           <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] flex flex-col gap-2 items-start">
             <HpPanel s={s} />
             <ScorePanel s={s} />
+          </div>
+
+          {/* Top Right: Auto-Fire Toggle + Pause + Wave Info */}
+          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <AutoAimToggle s={s} engine={engine} />
+              <button
+                onClick={() => engine?.pause()}
+                className="pointer-events-auto btn-ghost px-3 py-1.5 text-[10px] font-mono rounded-[3px] border border-bone/20 hover:border-bone/40"
+                title="Pause game (P / Esc)"
+              >
+                ❚❚ PAUSE [ESC]
+              </button>
+            </div>
+            <div className="hud-panel px-3 py-1.5 flex items-center gap-3">
+              <div>
+                <div className="stencil text-[7.5px] text-bone/45">Mission Wave</div>
+                <div className="text-sm font-extrabold text-toxic font-mono">
+                  {s.wave > 10 ? `ENDLESS · W${s.wave}` : `WAVE ${s.wave}/10`}
+                </div>
+              </div>
+              <div className="w-px h-6 bg-bone/15" />
+              <div>
+                <div className="stencil text-[7.5px] text-bone/45">Hostiles Left</div>
+                <div className="text-sm font-extrabold text-ember font-mono tabular-nums">
+                  {s.left}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Bottom Left: Dash & Buffs Status */}

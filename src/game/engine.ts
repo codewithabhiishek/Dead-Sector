@@ -1,5 +1,3 @@
-/* DEAD SECTOR — canvas game engine. Scrolling world, camera follow, all visuals procedural. */
-
 import {
   store,
   loadBest,
@@ -10,8 +8,11 @@ import {
   saveDifficulty,
   loadUnlocked,
   saveUnlocked,
+  loadAutoAim,
+  saveAutoAim,
   type BannerMsg,
   type Difficulty,
+  type RunStats,
 } from "./store";
 import { sfx } from "./audio";
 
@@ -267,6 +268,7 @@ export class Engine {
   private bossSpawned = false;
   private deadWave = 1;
   private supplyTimer = 14;
+  private autoAim = loadAutoAim();
 
   // progression
   private score = 0;
@@ -497,7 +499,15 @@ export class Engine {
       this.toggleFullscreen();
       return;
     }
+    if (c === "KeyZ" || c === "KeyT") {
+      this.toggleAutoAim();
+      return;
+    }
     if (c === "Enter" || c === "Space") {
+      if (this.phase === "victory") {
+        this.continueEndless();
+        return;
+      }
       if (this.phase === "menu" || this.phase === "gameover") {
         if (c === "Enter" || (c === "Space" && this.phase === "gameover")) {
           // quick-deploy: menu continues from latest progress, game over retries the fallen wave
@@ -540,6 +550,8 @@ export class Engine {
   private onResize = () => this.resize();
 
   private onBlur = () => {
+    this.mouseDown = false;
+    this.touchFiring = false;
     if (this.phase === "playing") this.pause();
   };
 
@@ -631,6 +643,9 @@ export class Engine {
     sfx.ui();
     sfx.stopDrone();
     this.phase = "menu";
+    this.keys.clear();
+    this.mouseDown = false;
+    this.touchFiring = false;
     this.zombies = [];
     this.bullets = [];
     this.acids = [];
@@ -639,6 +654,35 @@ export class Engine {
     this.boss = null;
     this.dead = false;
     this.seedAmbient();
+    this.syncHud(true);
+  }
+
+  toggleAutoAim(): boolean {
+    this.autoAim = !this.autoAim;
+    saveAutoAim(this.autoAim);
+    store.set({ autoAim: this.autoAim });
+    sfx.ui();
+    this.banner(
+      this.autoAim ? "AUTO-FIRE ENGAGED" : "MANUAL FIRE ENGAGED",
+      this.autoAim ? "AUTOMATIC TARGETING & FIRING ACTIVE [Z]" : "MANUAL TRIGGER ACTIVE [Z]",
+      this.autoAim ? "toxic" : "bone"
+    );
+    return this.autoAim;
+  }
+
+  setAutoAim(val: boolean) {
+    if (this.autoAim === val) return;
+    this.autoAim = val;
+    saveAutoAim(this.autoAim);
+    store.set({ autoAim: this.autoAim });
+  }
+
+  continueEndless() {
+    sfx.ui();
+    this.phase = "playing";
+    sfx.startDrone();
+    this.banner("ENDLESS PROTOCOL", "OVERTIME SURVIVAL ENGAGED · ×1.5 SCORE MULTIPLIER", "toxic");
+    this.startWave(11);
     this.syncHud(true);
   }
 
@@ -775,6 +819,8 @@ export class Engine {
 
   private startWave(n: number) {
     this.wave = n;
+    this.mouseDown = false;
+    this.touchFiring = false;
     const isBoss = n % 5 === 0;
     const patriarch = isBoss && n >= 10;
     this.bossSpawned = false;
@@ -825,22 +871,36 @@ export class Engine {
   }
 
   private hpScale() {
-    const linear = 1 + (this.wave - 1) * 0.2;
-    // waves 5-7 ramp hard, everything past wave 10 keeps compounding
-    const mid = this.wave >= 5 ? Math.pow(1.06, Math.min(this.wave, 10) - 4) : 1;
-    return this.wave > 10 ? linear * mid * Math.pow(1.07, this.wave - 10) : linear * mid;
+    const linear = 1 + (this.wave - 1) * 0.22;
+    // waves 6+ ramp hard, everything past wave 10 keeps compounding
+    const mid = this.wave >= 6 ? Math.pow(1.1, Math.min(this.wave, 10) - 5) : 1;
+    return this.wave > 10 ? linear * mid * Math.pow(1.08, this.wave - 10) : linear * mid;
   }
 
   private spdScale() {
-    return 1 + Math.min(this.wave, 40) * 0.022;
+    if (this.wave <= 5) {
+      return 1 + (this.wave - 1) * 0.032;
+    }
+    // Waves 6 to 10+ get noticeably faster and more dangerous
+    return 1 + 0.16 + (this.wave - 5) * 0.075;
   }
 
   private pickKind(): ZKind {
     const r = Math.random();
     if (this.surge) return r < 0.45 ? "spitter" : "runner";
-    const pBrute = this.wave >= 4 ? Math.min(0.2, 0.05 + this.wave * 0.014) : 0;
-    const pSpit = this.wave >= 3 ? Math.min(0.24, 0.07 + this.wave * 0.017) : 0;
-    const pRun = this.wave >= 2 ? Math.min(0.34, 0.1 + this.wave * 0.024) : 0;
+    if (this.wave >= 6) {
+      // Much more aggressive composition in higher waves
+      const pBrute = Math.min(0.24, 0.12 + (this.wave - 6) * 0.03);
+      const pSpit = Math.min(0.3, 0.2 + (this.wave - 6) * 0.025);
+      const pRun = Math.min(0.38, 0.28 + (this.wave - 6) * 0.025);
+      if (r < pBrute) return "brute";
+      if (r < pBrute + pSpit) return "spitter";
+      if (r < pBrute + pSpit + pRun) return "runner";
+      return "walker";
+    }
+    const pBrute = this.wave >= 4 ? Math.min(0.18, 0.05 + this.wave * 0.014) : 0;
+    const pSpit = this.wave >= 3 ? Math.min(0.22, 0.07 + this.wave * 0.017) : 0;
+    const pRun = this.wave >= 2 ? Math.min(0.32, 0.1 + this.wave * 0.024) : 0;
     if (r < pBrute) return "brute";
     if (r < pBrute + pSpit) return "spitter";
     if (r < pBrute + pSpit + pRun) return "runner";
@@ -869,7 +929,7 @@ export class Engine {
     const D = DIFFS[this.diffKey];
     const hs = this.hpScale() * hpMul * D.hp;
     const ss = this.spdScale() * D.spd;
-    const ds = (1 + Math.max(0, this.wave - 1) * 0.035) * D.dmg;
+    const ds = (1 + Math.max(0, this.wave - 1) * (this.wave >= 6 ? 0.055 : 0.035)) * D.dmg;
     switch (kind) {
       case "runner":
         return { ...base, kind, r: 11, hp: 16 * hs, maxHp: 16 * hs, speed: rand(118, 148) * ss, dmg: 6 * ds, score: 15 };
@@ -1319,6 +1379,14 @@ export class Engine {
     sfx.reload();
   }
 
+  private hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+    for (const o of this.obstacles) {
+      if (o.low) continue;
+      if (this.segHitsObs(x1, y1, x2, y2, o)) return false;
+    }
+    return true;
+  }
+
   private updateFiring(dt: number) {
     if (this.reloadT >= 0) {
       this.reloadT -= dt;
@@ -1329,7 +1397,28 @@ export class Engine {
       }
       return;
     }
-    const wantFire = this.mouseDown || this.touchFiring;
+
+    // Auto-Aim & Auto-Shooting (Laptop Assist: locks onto hostiles in range/lane without manual clicking)
+    let autoTarget: Zombie | null = null;
+    if (this.autoAim && !this.dead && this.phase === "playing") {
+      let closestD2 = 680 * 680;
+      for (const z of this.zombies) {
+        if (z.dead) continue;
+        const d2 = dist2(this.px, this.py, z.x, z.y);
+        if (d2 < closestD2) {
+          if (this.hasLineOfSight(this.px, this.py, z.x, z.y)) {
+            closestD2 = d2;
+            autoTarget = z;
+          }
+        }
+      }
+      // If auto-aiming and user isn't overriding with mouse/touch, align aim
+      if (autoTarget && !this.mouseDown && !this.touchFiring) {
+        this.aim = Math.atan2(autoTarget.y - this.py, autoTarget.x - this.px);
+      }
+    }
+
+    const wantFire = this.mouseDown || this.touchFiring || (this.autoAim && autoTarget !== null);
     this.fireT -= dt;
     if (!wantFire || this.fireT > 0 || this.dead) return;
     if (this.ammo <= 0) {
@@ -1526,12 +1615,16 @@ export class Engine {
       this.spawnT -= dt;
       if (this.spawnT <= 0 && this.zombies.length < aliveCap) {
         const burst =
-          this.wave >= 8 && Math.random() < 0.3 ? 3 : this.wave >= 5 && Math.random() < 0.35 ? 2 : 1;
+          this.wave >= 8
+            ? Math.random() < 0.5 ? 4 : 3
+            : this.wave >= 6
+              ? Math.random() < 0.55 ? 3 : 2
+              : this.wave >= 4 && Math.random() < 0.35 ? 2 : 1;
         for (let i = 0; i < burst && this.toSpawn > 0; i++) {
           this.spawnZombie();
           this.toSpawn--;
         }
-        this.spawnT = Math.max(0.2, 1.3 - this.wave * 0.09) * rand(0.7, 1.3);
+        this.spawnT = Math.max(0.18, (this.wave >= 6 ? 0.9 : 1.3) - this.wave * 0.075) * rand(0.7, 1.25);
       }
     } else if (this.zombies.length === 0) {
       // wave cleared
@@ -1539,14 +1632,17 @@ export class Engine {
       const heal = cleared >= 10 ? 40 : 10;
       this.hp = Math.min(this.maxHp, this.hp + heal);
       this.stamina = 100;
-      if (cleared === 10) {
-        this.banner("SECTOR PURGED", "ALL 10 WAVES CLEARED — OVERTIME: ENDLESS · ×1.5 SCORE", "toxic");
-      } else {
-        this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
-      }
       sfx.waveClear();
       this.bumpUnlocked(cleared + 1);
-      this.intermission = cleared === 10 ? 4 : 3;
+
+      // CAMPAIGN COMPLETE: Beat Wave 10!
+      if (cleared === 10 && this.phase === "playing") {
+        this.triggerVictory();
+        return;
+      }
+
+      this.banner("WAVE CLEARED", `+${heal} HP RECOVERED — REGROUPING`, "bone");
+      this.intermission = 3;
     }
     // spawn boss alongside wave 5,10,... — exactly ONE per wave
     if (this.wave % 5 === 0 && !this.bossSpawned && !this.boss && this.toSpawn <= Math.floor(this.toSpawnInit() / 2)) {
@@ -1561,6 +1657,33 @@ export class Engine {
         this.dropSupplyAirdrop(true);
       }
     }
+  }
+
+  private triggerVictory() {
+    this.phase = "victory";
+    this.keys.clear();
+    this.mouseDown = false;
+    this.touchFiring = false;
+    sfx.stopDrone();
+    sfx.waveClear();
+    saveBest(this.score, this.wave);
+    const bests = loadBest();
+    const shots = Math.max(1, this.shots);
+    const acc = clamp(this.hits / shots, 0, 1);
+    const stats: RunStats = {
+      score: this.score,
+      wave: this.wave,
+      kills: this.kills,
+      maxCombo: this.maxCombo,
+      accuracy: acc,
+      time: this.runT,
+      newBest: this.score >= bests.best,
+      best: Math.max(this.score, bests.best),
+      bestWave: Math.max(this.wave, bests.bestWave),
+    };
+    this.banner("SECTOR PURGED", "ALL 10 CAMPAIGN WAVES COMPLETED · SECTOR RECLAIMED", "toxic");
+    this.syncHud(true);
+    store.set({ stats, phase: "victory" });
   }
 
   private toSpawnInit(): number {
@@ -2075,6 +2198,7 @@ export class Engine {
   }
 
   private checkTier() {
+    if (this.wave >= 10) return; // In Level 10+, keep the weapon steady throughout the boss wave
     let t = 0;
     for (let i = 0; i < TIER_AT.length; i++) if (this.kills >= TIER_AT[i]) t = i;
     if (t > this.tier) {
@@ -2254,6 +2378,7 @@ export class Engine {
       lowHp: this.hp > 0 && this.hp < 30,
       time: this.runT,
       difficulty: this.diffKey,
+      autoAim: this.autoAim,
     };
     store.set(patch);
   }

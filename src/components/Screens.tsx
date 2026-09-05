@@ -192,7 +192,9 @@ export function MenuScreen({ engine }: ScreenProps) {
                 Mission Insertion Point
               </span>
               <span className="font-mono text-[8px] sm:text-[8.5px] text-toxic/75 tabular-nums">
-                Progress: Wave {Math.min(s.unlocked, 10)}/10 unlocked
+                {s.unlocked > 10
+                  ? "Campaign Cleared (10/10) · Endless Unlocked ★"
+                  : `Progress: Wave ${Math.min(s.unlocked, 10)}/10 unlocked`}
               </span>
             </div>
             {/* 5 cols on mobile (2 rows), 10 cols on tablet/desktop */}
@@ -230,10 +232,33 @@ export function MenuScreen({ engine }: ScreenProps) {
                 );
               })}
             </div>
+
+            {/* Endless Mode Selector if wave 10 cleared */}
+            {s.unlocked > 10 && (
+              <button
+                type="button"
+                onClick={() => setSel(11)}
+                className={`mt-1.5 w-full py-1.5 px-3 flex items-center justify-between border rounded-[3px] transition-all font-mono ${
+                  sel >= 11
+                    ? "border-toxic bg-toxic/20 text-toxic shadow-[0_0_14px_rgba(163,245,46,0.35)]"
+                    : "border-bone/20 bg-black/40 text-bone/70 hover:border-toxic/60 hover:text-bone"
+                }`}
+              >
+                <span className="flex items-center gap-1.5 font-bold text-[9.5px] sm:text-[10.5px]">
+                  <span className="text-toxic font-extrabold">★</span> ENDLESS SURVIVAL PROTOCOL (WAVE 11+)
+                </span>
+                <span className="text-[7.5px] sm:text-[8.5px] text-toxic/80 font-semibold">
+                  OVERTIME · ×1.5 SCORE
+                </span>
+              </button>
+            )}
+
             <p className="mt-0.5 text-center font-mono text-[7.5px] sm:text-[8px] text-bone/45 truncate px-1">
-              {sel % 5 === 0
-                ? `[WARNING] Apex boss signature detected on wave ${sel} — heavy ordnance advised`
-                : `Insertion point: wave ${sel} · initial weapon and supplies scaled to sector`}
+              {sel >= 11
+                ? "[ENDLESS SURVIVAL] Waves scale indefinitely — test operator endurance"
+                : sel % 5 === 0
+                  ? `[WARNING] Apex boss signature detected on wave ${sel} — heavy ordnance advised`
+                  : `Insertion point: wave ${sel} · initial weapon and supplies scaled to sector`}
             </p>
           </section>
 
@@ -268,13 +293,42 @@ export function MenuScreen({ engine }: ScreenProps) {
               </div>
             </div>
 
+            {/* Laptop Assist / Automatic Shooting Toggle */}
+            <div className="w-full flex items-center justify-between bg-black/40 border border-bone/15 px-2.5 py-1.5 rounded-[3px] mt-1.5">
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] sm:text-[9.5px] font-bold text-bone flex items-center gap-1.5">
+                  <CrosshairIcon className="w-3 h-3 text-toxic" /> Automatic Shooting (Laptop Assist)
+                </span>
+                <span className="text-[7.5px] text-bone/50 font-mono">
+                  Auto-targets & fires at hostiles in range (Toggle anytime with [Z])
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => engine?.toggleAutoAim()}
+                className={`px-2.5 py-1 text-[8.5px] sm:text-[9px] font-mono font-bold rounded-[2px] transition-all shrink-0 ${
+                  s.autoAim
+                    ? "bg-toxic text-black border border-toxic shadow-[0_0_10px_rgba(163,245,46,0.4)]"
+                    : "bg-bone/10 text-bone/60 border border-bone/20 hover:text-bone"
+                }`}
+              >
+                {s.autoAim ? "AUTO-FIRE ON" : "MANUAL ONLY"}
+              </button>
+            </div>
+
             <div className="w-full grid grid-cols-[1fr_42px_42px] sm:grid-cols-[1fr_46px_46px] gap-1.5 sm:gap-2 mt-1.5">
               <button
                 onClick={() => engine?.start(sel)}
                 className="btn-deploy h-[42px] sm:h-[46px] font-ui font-extrabold text-[13px] sm:text-[14.5px] min-w-0 px-2"
               >
                 <span className="truncate">
-                  {sel === 1 ? "DEPLOY TO SECTOR" : sel === Math.min(s.unlocked, 10) && s.unlocked > 1 ? `CONTINUE · W${sel}` : `DEPLOY · W${sel}`}
+                  {sel >= 11
+                    ? "DEPLOY · ENDLESS PROTOCOL"
+                    : sel === 1
+                      ? "DEPLOY TO SECTOR"
+                      : sel === Math.min(s.unlocked, 10) && s.unlocked > 1
+                        ? `CONTINUE · W${sel}`
+                        : `DEPLOY · W${sel}`}
                 </span>
                 <PlayIcon className="w-3.5 h-3.5 shrink-0" />
               </button>
@@ -463,7 +517,18 @@ export function PauseScreen({ engine }: ScreenProps) {
           <button onClick={() => engine?.toMenu()} className="btn-danger py-2.5 text-[12px] min-h-[40px]">
             Abandon mission
           </button>
-          <div className="grid grid-cols-2 gap-2 mt-1">
+          <button
+            onClick={() => engine?.toggleAutoAim()}
+            className="btn-ghost py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[40px]"
+            title="Toggle auto-targeting & firing (Key Z)"
+          >
+            <CrosshairIcon className="w-3.5 h-3.5 text-toxic" />
+            Auto-Shooting:{" "}
+            <span className={s.autoAim ? "text-toxic font-bold" : "text-bone/50"}>
+              {s.autoAim ? "ENABLED [Z]" : "DISABLED [Z]"}
+            </span>
+          </button>
+          <div className="grid grid-cols-2 gap-2 mt-0.5">
             <button
               onClick={() => engine?.toggleFullscreen()}
               className="btn-ghost py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[40px]"
@@ -483,7 +548,7 @@ export function PauseScreen({ engine }: ScreenProps) {
           </div>
         </div>
         <div className="mt-3.5 stencil text-[8px] sm:text-[9px] text-bone/35">
-          P / Esc to resume · F to maximize · M to mute
+          P / Esc to resume · Z to toggle auto-fire · F to maximize · M to mute
         </div>
       </div>
     </div>
@@ -554,6 +619,90 @@ export function GameOverScreen({ engine }: ScreenProps) {
           </div>
           <div className="mt-3 stencil text-[8px] sm:text-[8.5px] text-bone/30">
             Progress is saved to mission select
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- victory screen ----------------------------- */
+
+export function VictoryScreen({ engine }: ScreenProps) {
+  const s = useSnap();
+  if (s.phase !== "victory") return null;
+  const acc = Math.round((s.stats?.accuracy ?? 0) * 100);
+  const newBest = s.stats?.newBest ?? false;
+  const stats: { label: string; value: string }[] = [
+    { label: "Final score", value: s.score.toLocaleString() },
+    { label: "Campaign status", value: "PURGED (10/10)" },
+    { label: "Kills", value: `${s.kills}` },
+    { label: "Best combo", value: `×${s.stats?.maxCombo ?? 0}` },
+    { label: "Accuracy", value: `${acc}%` },
+    { label: "Mission time", value: fmtClock(s.time) },
+  ];
+  return (
+    <div
+      className="absolute inset-0 z-30 flex items-center justify-center px-3 py-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+      style={{ background: "rgba(6,18,8,0.85)" }}
+    >
+      <div className="relative w-full max-w-md max-h-[94dvh] overflow-y-auto custom-scroll">
+        <div className="panel p-5 sm:p-7 text-center border-toxic/60 shadow-[0_0_40px_rgba(163,245,46,0.25)]">
+          <div className="stencil text-[8.5px] sm:text-[9px] text-toxic/90 mb-1.5 flex items-center justify-center gap-1.5 font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-toxic animate-pulse" />
+            Sector 7 Containment Re-Established
+          </div>
+          <h2
+            className="font-display text-4xl sm:text-5xl text-toxic leading-none"
+            style={{ textShadow: "0 0 36px rgba(163,245,46,0.6), 0 4px 0 #123307" }}
+          >
+            SECTOR PURGED
+          </h2>
+          <div className="mt-1.5 stencil text-[9.5px] sm:text-[10px] text-bone/70">
+            All 10 campaign waves eradicated · Apex Patriarch neutralized
+          </div>
+
+          <div className="mt-3.5 inline-block border border-toxic/60 bg-toxic/15 px-3.5 py-1 stencil text-[9px] sm:text-[10px] text-toxic shadow-[0_0_18px_rgba(163,245,46,0.3)]">
+            ★ CAMPAIGN VICTORY · ENDLESS PROTOCOL UNLOCKED
+          </div>
+
+          {newBest && (
+            <div className="mt-2 inline-block border border-amber-400/60 bg-amber-400/10 px-3 py-0.5 stencil text-[8.5px] sm:text-[9.5px] text-amber-300">
+              ★ New personal best record
+            </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-px bg-bone/10 border border-bone/10">
+            {stats.map((st) => (
+              <div key={st.label} className="bg-[#0a140d] px-2 py-2 sm:py-2.5">
+                <div className="stencil text-[7.5px] sm:text-[8px] text-bone/40">{st.label}</div>
+                <div className="mt-0.5 text-base sm:text-lg font-extrabold text-toxic tabular-nums leading-none">
+                  {st.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2.5 stencil text-[8.5px] sm:text-[9px] text-bone/45 tabular-nums">
+            Personal best · {s.best.toLocaleString()} pts · Wave {s.bestWave}
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2">
+            <button
+              onClick={() => engine?.continueEndless()}
+              className="btn-primary py-3 text-sm min-h-[44px] flex items-center justify-center gap-2"
+            >
+              <PlayIcon className="w-4 h-4" /> CONTINUE: ENDLESS SURVIVAL (WAVE 11+)
+            </button>
+            <button
+              onClick={() => engine?.toMenu()}
+              className="btn-ghost py-2.5 text-[12px] min-h-[40px]"
+            >
+              Return to Base (Mission Select)
+            </button>
+          </div>
+          <div className="mt-3 stencil text-[8px] sm:text-[8.5px] text-bone/35">
+            Endless Protocol (Wave 11+) is now unlocked in Mission Select
           </div>
         </div>
       </div>

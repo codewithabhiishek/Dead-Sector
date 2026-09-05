@@ -1,6 +1,6 @@
 /* Tiny external store bridging the canvas engine and the React HUD. */
 
-export type Phase = "menu" | "playing" | "paused" | "gameover";
+export type Phase = "menu" | "playing" | "paused" | "gameover" | "victory";
 
 export type Difficulty = "recruit" | "veteran" | "nightmare";
 
@@ -70,6 +70,7 @@ export interface Snapshot {
   difficulty: Difficulty;
   unlocked: number; // highest selectable wave (progress)
   fullscreen: boolean;
+  autoAim: boolean;
 }
 
 const defaultSnap: Snapshot = {
@@ -107,6 +108,8 @@ const defaultSnap: Snapshot = {
   waveClearHeal: false,
   difficulty: "veteran",
   unlocked: loadUnlocked(),
+  fullscreen: false,
+  autoAim: loadAutoAim(),
 };
 
 type Listener = () => void;
@@ -202,3 +205,22 @@ export function saveUnlocked(w: number): void {
     /* ignore */
   }
 }
+
+export function loadAutoAim(): boolean {
+  try {
+    // Default to true for accessible laptop play if not set
+    const v = localStorage.getItem("ds_auto_aim");
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function saveAutoAim(enabled: boolean): void {
+  try {
+    localStorage.setItem("ds_auto_aim", enabled ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+

@@ -3,7 +3,7 @@ import { Engine } from "./game/engine";
 import { store } from "./game/store";
 import { useSnap } from "./components/HUD";
 import HUD from "./components/HUD";
-import { MenuScreen, PauseScreen, GameOverScreen, Banner, TouchControls } from "./components/Screens";
+import { MenuScreen, PauseScreen, GameOverScreen, VictoryScreen, Banner, TouchControls } from "./components/Screens";
 import { Analytics } from "@vercel/analytics/react";
 
 export default function App() {
@@ -102,6 +102,7 @@ export default function App() {
       <MenuScreen engine={engine} />
       <PauseScreen engine={engine} />
       <GameOverScreen engine={engine} />
+      <VictoryScreen engine={engine} />
       <Analytics />
     </div>
   );
