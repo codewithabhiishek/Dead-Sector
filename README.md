@@ -2,21 +2,21 @@
 
 # ☣️ DEAD SECTOR
 
-### *Sector 9 Quarantine Protocol · Top-Down Survival Horror*
+### *Sector 7 Quarantine Protocol · Top-Down Survival Horror*
 
-[![Vite](https://img.shields.io/badge/Vite-6.3-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![React](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.4-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Web Audio API](https://img.shields.io/badge/Web%20Audio-Procedural-f59e0b?style=for-the-badge&logo=soundcharts&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <b>The perimeter wire is breached. Quarantine has failed.</b><br/>
-  Scavenge the ruins of Sector 9, utilize abandoned wrecks for tactical cover, and unleash high-caliber firepower across 10 escalating waves of relentless undead mutations.
+  <b>The perimeter wire is breached. Quarantine has collapsed.</b><br/>
+  Scavenge the ruins of Sector 7, utilize tactical cover, and unleash high-caliber firepower across 10 escalating campaign waves, culminating in the apex Patriarch boss encounter and infinite Endless Survival Protocol.
 </p>
 
-[🕹️ Play on Localhost](#-quick-start) • [⚡ Features](#-key-features) • [🔫 The Arsenal](#-the-arsenal) • [🧟 Bestiary](#-threat-index) • [🎮 Controls](#-controls--tactics)
+[🕹️ Play on Localhost](#-quick-start) • [⚡ Key Features](#-key-features) • [🔫 The Arsenal](#-the-arsenal) • [🧟 Threat Index](#-threat-index) • [🎮 Controls](#-controls--tactics) • [⚙️ Protocols](#-difficulty-protocols)
 
 ---
 
@@ -24,32 +24,34 @@
 
 ## 📖 Overview
 
-**DEAD SECTOR** is a fast-paced, top-down tactical zombie survival game engineered from scratch in **TypeScript**, rendered using an ultra-optimized **HTML5 Canvas 2D** rendering engine, styled with **Tailwind CSS**, and fueled by a **zero-asset, 100% procedurally synthesized Web Audio engine**. 
+**DEAD SECTOR** is a fast-paced, top-down tactical survival shooter engineered from scratch in **TypeScript**, rendered using an ultra-optimized **HTML5 Canvas 2D** rendering engine, styled with **Tailwind CSS**, and fueled by a **zero-asset, 100% procedurally synthesized Web Audio engine**. 
 
-Navigate an expansive 3400×2300 apocalyptic quarantine zone packed with dynamic gore, reactive lighting, blood decals, directional audio feedback, particle systems, weapon progression tiers, and menacing boss encounters every 5th wave.
+Navigate an expansive 3400×2300 apocalyptic quarantine zone featuring dynamic gore, line-of-sight raycasting, reactive lighting, blood decals, directional audio feedback, particle systems, weapon progression tiers, tactical supply airdrops, and menacing apex boss battles.
 
 ---
 
 ## ⚡ Key Features
 
-- **💥 High-Performance Canvas 2D Engine**: Runs silky smooth at 60+ FPS with hundreds of active entities, custom vector raycasting, shell casings, dynamic muzzle lighting, and persistent blood splatters.
-- **🔊 Procedural Sound Synthesis**: Zero audio assets loaded over the network! Every gunshot, reload click, zombie screech, shell drop, heartbeat, and low-frequency drone is procedurally generated via the **Web Audio API**.
-- **🔫 7-Tier Weapon Progression**: Seamlessly unlock new armaments as your kill count climbs—from standard issue sidearms to rapid-fire miniguns and high-tech railguns.
-- **🧟 Distinct Hostile Classes & Bosses**: Battle relentless Walkers, agile flanking Runners, acid-spewing Spitters, heavily armored Brutes, and screen-shaking Abomination bosses.
-- **🎯 Tactical Movement & Combat**: Fluid WASD navigation, sprint stamina management, invulnerability-frame combat dashing, tactical active reloading, and an escalating combo multiplier window.
-- **📱 Fully Responsive & Touch-Ready**: Native virtual analog sticks and quick-action touch controls for seamless mobile and tablet play.
+- **💥 High-Performance Canvas 2D Engine**: Silky smooth at 60+ FPS with hundreds of active entities, custom vector raycasting, shell casings, dynamic muzzle lighting, and persistent blood splatters.
+- **🎯 Automatic Shooting & Auto-Aim (Laptop Mode)**: Designed for effortless laptop and trackpad play! The system scans for nearest hostiles in line-of-sight, smoothly aligns your firing arc, and triggers continuous fire while threats are in range. Toggle on-the-fly with <kbd>Z</kbd> or <kbd>T</kbd>, or use full manual override anytime.
+- **🏆 Dedicated Campaign Victory Sequence**: Purge all 10 campaign waves to neutralize the Patriarch and trigger the **Sector Purged** victory debriefing with complete statistics (score, accuracy, kills, combo, mission time).
+- **♾️ Endless Survival Protocol (Wave 11+)**: After conquering the 10-wave campaign, unlock infinite overtime survival with exponential zombie scaling and a permanent ×1.5 score multiplier.
+- **🔒 Wave 10 Weapon Stability**: Your heavy loadout is locked during Wave 10+ so mid-wave tier shifts never disrupt your battle against the apex boss.
+- **🔥 Rebalanced High-Wave Escalation**: Waves 6–10 feature aggressive sprinting runners (up to 230 px/s), dense acid spitters, high-HP brutes, and rapid burst spawning that forces you to manage stamina, dash, and utilize cover.
+- **🔊 Procedural Sound Synthesis**: Zero audio files loaded over the network! Every gunshot, reload click, zombie screech, shell drop, heartbeat, and low-frequency drone is procedurally generated via the **Web Audio API**.
+- **🔫 7-Tier Weapon Progression**: Standard sidearms, high-capacity vector SMGs, combat shotguns, assault rifles, rapid miniguns, incendiary spread weapons, and infinite-pierce railguns.
+- **📱 Responsive & Touch-Ready**: Custom virtual analog sticks and quick-action touch controls for seamless mobile and tablet play.
 - **📊 Tactical HUD & Atmosphere**: Retro CRT scanlines, chromatic hurt vignettes, dynamic crosshair bloom, stamina bars, mini-radar, and mission debrief telemetry.
-- **⚙️ 3 Threat Protocols**: Choose between **Recruit**, **Veteran**, or **Nightmare** difficulty with custom health, speed, horde density, and score scaling.
 
 ---
 
 ## 🔫 The Arsenal
 
-As you eliminate hostiles, your combat tier advances automatically:
+As you eliminate hostiles, your combat tier advances automatically (stabilized at peak tier during Wave 10+):
 
 | Tier | Weapon | DMG | Fire Rate | Mag | Reload | Special Properties |
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
-| **0** | **M9 SIDEARM** | 13 | 4.4 rps | 12 | 0.85s | Reliable semi-auto sidearm with fast recovery |
+| **0** | **M9 SIDEARM** | 13 | 4.4 rps | 12 | 0.85s | Reliable semi-auto sidearm with fast tactical recovery |
 | **1** | **VECTOR SMG** | 9 | 11.5 rps | 34 | 1.05s | Blistering fire rate, shreds unarmored hordes |
 | **2** | **COMBAT SHOTGUN** | 16×8 | 3.4 rps | 10 | 1.10s | Piercing 8-pellet buckshot spread with frontline punch & sub-bass kick |
 | **3** | **AK-74 RIFLE** | 17 | 7.6 rps | 30 | 1.20s | High penetration bullet velocity with 1-target pierce |
@@ -63,11 +65,12 @@ As you eliminate hostiles, your combat tier advances automatically:
 
 | Threat | Classification | Threat Level | Characteristics |
 | :--- | :--- | :---: | :--- |
-| **WALKER** | Common Infected | 🟩 1/5 | Slow and shambling, but deadly in swarming numbers. |
-| **RUNNER** | Agitated Infected | 🟨 2/5 | Quick flankers that rapidly close combat distance. |
-| **SPITTER** | Bio-Corrosive | 🟧 3/5 | Artillery unit lobbing corrosive chemical acid pools. |
+| **WALKER** | Common Infected | 🟩 1/5 | Slow and shambling, deadly in swarming choke points. |
+| **RUNNER** | Agitated Infected | 🟨 2/5 | Lightning-fast flankers sprinting at up to 230 px/s in waves 6–10. |
+| **SPITTER** | Bio-Corrosive | 🟧 3/5 | Long-range artillery lobbing corrosive area-denial acid pools. |
 | **BRUTE** | Mutated Tank | 🟥 4/5 | Heavily armored behemoth capable of soaking immense damage. |
-| **ABOMINATION** | Apex Biohazard | 💀 5/5 | Colossal sector boss firing devastating plasma volleys every 5th wave. |
+| **ABOMINATION** | Mid-Tier Boss (Wave 5) | 💀 4.5/5 | Massive biohazard signature firing high-damage projectile volleys. |
+| **THE PATRIARCH** | Apex Sector Boss (Wave 10) | ☠️ 5/5 | Devastating titan with massive health reserves, plasma strikes, and tactical horde summons. |
 
 ---
 
@@ -75,41 +78,54 @@ As you eliminate hostiles, your combat tier advances automatically:
 
 ### Desktop Controls
 
-| Action | Input | Tactical Tip |
+| Action | Input | Tactical Description |
 | :--- | :--- | :--- |
-| **Move** | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd> | Keep moving to prevent getting cornered against sector walls. |
-| **Aim & Shoot** | <kbd>Mouse</kbd> + <kbd>Left Click</kbd> | Hold LMB for full-auto spray; lead your shots against fast runners. |
-| **Combat Dash** | <kbd>Space</kbd> | Grants brief invulnerability frames to slip through tight chokepoints. |
+| **Move** | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd> | Keep maneuvering to prevent getting trapped against sector obstacles. |
+| **Aim & Shoot** | <kbd>Mouse</kbd> + <kbd>LMB</kbd> | Manual aiming and firing with full precision and trigger control. |
+| **Auto-Shoot Toggle** | <kbd>Z</kbd> or <kbd>T</kbd> | **Laptop Assist Mode:** Automatically aims and fires at enemies in line-of-sight. |
+| **Combat Dash** | <kbd>Space</kbd> or <kbd>RMB</kbd> | Grants invulnerability frames to dodge through aggressive hordes. |
 | **Sprint** | <kbd>Shift</kbd> | Burns stamina for a quick burst of emergency speed. |
-| **Reload** | <kbd>R</kbd> | Reload during calm moments or wait for automatic reload on empty. |
-| **Maximize Screen** | <kbd>F</kbd> | Toggle full-screen immersive view anytime. |
-| **Toggle Audio** | <kbd>M</kbd> | Mute or unmute procedural synthesized sound effects. |
-| **Pause / Menu** | <kbd>P</kbd> or <kbd>Esc</kbd> | Freeze action and review combat telemetry. |
+| **Reload** | <kbd>R</kbd> | Active reload during calm moments (auto-reloads when empty). |
+| **Maximize Screen** | <kbd>F</kbd> | Toggle full-screen mode anytime. |
+| **Toggle Audio** | <kbd>M</kbd> | Mute / unmute synthesized sound effects. |
+| **Pause / Resume** | <kbd>P</kbd> or <kbd>Esc</kbd> | Freeze action and adjust combat settings. |
 
-### Mobile Controls
-- **Left Virtual Stick**: Smooth omnidirectional character movement.
-- **Right Virtual Stick**: 360° twin-stick aiming and continuous trigger.
-- **Touch Action Buttons**: Instant Dash, Sprint toggle, and Reload triggers.
+### Mobile & Touch Controls
+
+- **Left Virtual Joystick**: Smooth omnidirectional movement.
+- **Right Virtual Joystick**: 360° twin-stick aiming and firing.
+- **Tactical Buttons**: Instant Dash, Sprint lock, Auto-Fire toggle, and Pause.
+
+---
+
+## ⚙️ Difficulty Protocols
+
+| Protocol | Multipliers | Description |
+| :--- | :--- | :--- |
+| **RECRUIT** | HP: 0.70× · DMG: 0.65× · SPD: 0.88× · Score: 0.75× | Thinner horde, softer bites, ideal for learning mechanics. |
+| **VETERAN** | HP: 1.00× · DMG: 1.00× · SPD: 1.00× · Score: 1.00× | The intended tactical survival challenge. |
+| **NIGHTMARE** | HP: 1.40× · DMG: 1.30× · SPD: 1.14× · Score: 1.60× | Denser, faster, relentless swarms for veteran survivors. |
 
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
-- **UI & State**: [React 18](https://reactjs.org/) + [Lucide React](https://lucide.dev/) for HUD, tactical menus, and game state snapshots.
-- **Build Tool**: [Vite 6](https://vitejs.dev/) with lightning-fast Hot Module Replacement (HMR).
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) + custom scanline shaders and cyber-military typography (`Oxanium` & `Creepster`).
-- **Game Engine**: Custom object-oriented canvas engine featuring:
-  - Deterministic fixed/delta time loop (`requestAnimationFrame`)
-  - Spatial partitioning for bullet-to-zombie hit registration
-  - Particle emitters for fire, muzzle flare, blood splatters, and environmental embers
-  - Procedural sound synthesis engine with zero network MP3/WAV dependencies
+- **UI & State**: [React 19](https://reactjs.org/) + [Lucide React](https://lucide.dev/) for HUD, victory terminals, and external reactive store.
+- **Build Tool**: [Vite 6](https://vitejs.dev/) with instantaneous Hot Module Replacement.
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) with military HUD styling, CRT scanline effects, and responsive layout grids.
+- **Game Engine**: Custom object-oriented canvas engine:
+  - Fixed / delta-time game loop (`requestAnimationFrame`)
+  - Continuous raycasting and line-of-sight obstacle collision
+  - Advanced auto-aim target acquisition and firing controller
+  - Procedural particle emitters for smoke, sparks, acid, fire, and blood decals
+  - 100% procedural sound synthesis engine using the Web Audio API
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (version 18.0.0 or higher recommended)
+- [Node.js](https://nodejs.org/) (v18.0.0 or higher recommended)
 - [npm](https://www.npmjs.com/) or [pnpm](https://pnpm.io/)
 
 ### Installation
@@ -147,11 +163,11 @@ Dead-Sector/
 ├── public/                 # Static public assets
 ├── src/
 │   ├── components/
-│   │   ├── HUD.tsx         # Tactical heads-up display, radar, and status bars
-│   │   └── Screens.tsx     # Menu, pause, game over, and mobile touch joysticks
+│   │   ├── HUD.tsx         # Tactical heads-up display, auto-fire toggle, and status bars
+│   │   └── Screens.tsx     # Menu, pause, victory screen, game over, and touch controls
 │   ├── game/
 │   │   ├── audio.ts        # Pure Web Audio procedural sound synthesizer
-│   │   ├── engine.ts       # 2D canvas game loop, physics, weapons & horde AI
+│   │   ├── engine.ts       # 2D canvas game loop, auto-aim, weapons & horde AI
 │   │   └── store.ts        # Reactive snapshot store bridging engine & React HUD
 │   ├── App.tsx             # Root layout with atmospheric scanlines & canvas
 │   ├── index.css           # Tailwind CSS directives & tactical style utilities
