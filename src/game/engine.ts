@@ -12,6 +12,7 @@ import {
   saveAutoAim,
   type BannerMsg,
   type Difficulty,
+  type Phase,
   type RunStats,
 } from "./store";
 import { sfx } from "./audio";
@@ -212,7 +213,7 @@ export class Engine {
   private dpr = 1;
   private destroyed = false;
 
-  private phase: "menu" | "playing" | "paused" | "gameover" = "menu";
+  private phase: Phase = "menu";
 
   // camera
   private cam = { x: CX, y: CY };

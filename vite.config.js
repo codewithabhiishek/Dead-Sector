@@ -12,4 +12,20 @@ export default defineConfig({
       port: 3000,
     },
   },
+  build: {
+    target: "es2022",
+    minify: "esbuild",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/@vercel/analytics")) {
+            return "vendor-analytics";
+          }
+        },
+      },
+    },
+  },
 });
